@@ -110,7 +110,7 @@
         <div class="flex flex-col items-center justify-center mb-8 relative z-10">
             <img src="https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png" alt="Ailabs gen pro Logo" class="w-20 md:w-28 drop-shadow-[0_0_15px_rgba(0,150,255,0.6)] mb-3 object-contain">
             <h1 class="text-[18px] md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-blue-600">Motion Control</h1>
-            <p class="text-[11px] md:text-sm text-blue-200/70 mt-1">Ailabs gen pro Engine</p>
+            <p class="text-[11px] md:text-sm text-blue-200/70 mt-1">Powered by Kling 3 & Ailabs gen pro</p>
         </div>
 
         <!-- FORM LOGIN / VERIFIKASI -->
@@ -124,7 +124,6 @@
                     <label class="block text-xs text-gray-400 mb-1">Email Terdaftar</label>
                     <input type="email" id="loginEmail" placeholder="contoh@gmail.com" class="glass-input w-full px-4 py-3 rounded-lg text-sm md:text-base">
                 </div>
-                <!-- API Key Input sudah dihapus dari UI -->
                 <button id="verifyBtn" onclick="verifyAccess()" class="btn-glow w-full py-3 rounded-lg text-sm md:text-base font-bold text-white mt-2">
                     Buka Akses
                 </button>
@@ -133,7 +132,6 @@
 
         <!-- APLIKASI UTAMA (Disembunyikan sebelum login) -->
         <div id="appSection" class="hidden relative z-10">
-            <!-- Info User Aktif -->
             <div class="flex items-center justify-between bg-blue-900/30 border border-blue-500/30 rounded-lg p-3 mb-6">
                 <div class="flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
@@ -148,12 +146,12 @@
                 <label class="upload-area rounded-xl p-4 md:p-8 flex flex-col items-center justify-center cursor-pointer group text-center min-h-[140px] md:min-h-[200px] relative overflow-hidden">
                     <div id="photoDefault" class="flex flex-col items-center justify-center w-full transition-opacity duration-300">
                         <svg class="w-6 h-6 md:w-10 md:h-10 text-blue-400 mb-2 md:mb-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        <span class="text-[13px] md:text-xl font-semibold text-gray-300">Upload Foto</span>
+                        <span class="text-[13px] md:text-xl font-semibold text-gray-300">Upload Foto Wajah</span>
                         <span class="text-[10px] md:text-sm text-gray-500 mt-1">PNG, JPG (Max 5MB)</span>
                     </div>
                     <div id="photoPreviewContainer" class="hidden absolute inset-0 w-full h-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center p-2">
                         <img id="photoPreview" class="w-full h-full object-contain rounded-lg drop-shadow-2xl" />
-                        <span class="absolute bottom-2 bg-blue-600/80 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-md border border-blue-400/50 shadow-[0_0_10px_rgba(0,150,255,0.5)]">🔒 Face Lock Active</span>
+                        <span class="absolute bottom-2 bg-blue-600/80 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-md border border-blue-400/50 shadow-[0_0_10px_rgba(0,150,255,0.5)]">🔒 Face Lock Ready</span>
                     </div>
                     <input type="file" id="photoInput" class="hidden" accept="image/*" onchange="window.handlePhotoUpload(this)">
                 </label>
@@ -162,8 +160,8 @@
                 <label class="upload-area rounded-xl p-4 md:p-8 flex flex-col items-center justify-center cursor-pointer group text-center min-h-[140px] md:min-h-[200px] relative overflow-hidden">
                     <div id="videoDefault" class="flex flex-col items-center justify-center w-full transition-opacity duration-300">
                         <svg class="w-6 h-6 md:w-10 md:h-10 text-blue-400 mb-2 md:mb-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                        <span class="text-[13px] md:text-xl font-semibold text-gray-300">Upload Video</span>
-                        <span class="text-[10px] md:text-sm text-gray-500 mt-1">MP4 (Max 20MB)</span>
+                        <span class="text-[13px] md:text-xl font-semibold text-gray-300">Upload Video Motion</span>
+                        <span class="text-[10px] md:text-sm text-gray-500 mt-1">MP4 (Max 20MB, 3-30 detik)</span>
                     </div>
                     <div id="videoPreviewContainer" class="hidden absolute inset-0 w-full h-full bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center p-2">
                         <video id="videoPreview" class="w-full h-full object-contain rounded-lg drop-shadow-2xl" autoplay loop muted playsinline></video>
@@ -171,6 +169,32 @@
                     </div>
                     <input type="file" id="videoInput" class="hidden" accept="video/*" onchange="window.handleVideoUpload(this)">
                 </label>
+            </div>
+
+            <!-- Pilihan Model AI Magnific Kling 3 -->
+            <div class="bg-black/40 border border-blue-500/30 rounded-xl p-4 md:p-6 mb-6 max-w-2xl mx-auto w-full">
+                <label class="block text-xs md:text-sm text-gray-400 mb-2">Pilih Model AI Magnific</label>
+                <select id="modelSelect" class="glass-input w-full px-4 py-3 rounded-lg text-sm md:text-base appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230099ff%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-no-repeat bg-[position:right_1rem_center]">
+                    <option value="std" class="bg-gray-900 text-white">Kling 3 Standard (Kecepatan & Kualitas Standar)</option>
+                    <option value="pro" class="bg-gray-900 text-white">Kling 3 Pro (Kualitas Maksimal & Lebih Halus)</option>
+                </select>
+            </div>
+
+            <!-- API Key Input (Dalam App) -->
+            <div class="bg-black/40 border border-blue-500/30 rounded-xl p-4 md:p-6 mb-8 max-w-2xl mx-auto w-full">
+                <label class="block text-xs md:text-sm text-gray-400 mb-2">API Key Magnific (Dibutuhkan untuk Generate)</label>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="appApiKey" placeholder="Masukkan API Key Magnific Anda..." class="glass-input flex-1 px-4 py-3 rounded-lg text-sm md:text-base">
+                    <button onclick="window.saveApiKey()" id="saveApiKeyBtn" class="bg-blue-600/50 border border-blue-400 hover:bg-blue-500 text-white px-6 py-3 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Simpan
+                    </button>
+                    <button onclick="window.deleteApiKey()" id="deleteApiKeyBtn" class="bg-red-600/50 border border-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Hapus
+                    </button>
+                </div>
+                <p id="apiKeyStatus" class="text-xs text-red-400 mt-2">Status: Belum tersimpan</p>
             </div>
 
             <!-- Tombol Generate -->
@@ -190,23 +214,24 @@
             Render Selesai!
         </h2>
         <div class="w-full max-w-lg aspect-video bg-black/60 rounded-xl overflow-hidden border border-blue-500/30 mb-6 relative shadow-[0_0_20px_rgba(0,150,255,0.2)]">
-            <video id="resultVideo" class="w-full h-full object-contain" controls playsinline></video>
+            <video id="resultVideo" class="w-full h-full object-contain" controls playsinline autoplay loop></video>
             <span class="absolute top-3 right-3 bg-blue-600/90 text-white text-[10px] px-3 py-1 rounded-full backdrop-blur-md border border-blue-400 shadow-lg">🔒 Strict Face Lock Applied</span>
         </div>
-        <a id="downloadBtn" href="#" download="Ailabs_Motion_Result.mp4" class="btn-glow !bg-gradient-to-r !from-green-600 !to-emerald-500 hover:!from-green-500 hover:!to-emerald-400 px-8 py-3 md:py-4 rounded-xl text-[13px] md:text-lg font-bold text-white shadow-lg flex items-center justify-center gap-2 w-full md:w-1/2 transition-all">
+        <a id="downloadBtn" href="#" download="Ailabs_Motion_Result.mp4" target="_blank" class="btn-glow !bg-gradient-to-r !from-green-600 !to-emerald-500 hover:!from-green-500 hover:!to-emerald-400 px-8 py-3 md:py-4 rounded-xl text-[13px] md:text-lg font-bold text-white shadow-lg flex items-center justify-center gap-2 w-full md:w-1/2 transition-all">
             <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             Download Video
         </a>
     </div>
 
     <!-- Loading Overlay Screen -->
-    <div id="loadingOverlay" class="fixed inset-0 z-50 hidden flex-col items-center justify-center bg-black/90 backdrop-blur-md">
+    <div id="loadingOverlay" class="fixed inset-0 z-50 hidden flex-col items-center justify-center bg-black/95 backdrop-blur-md">
         <div class="relative w-20 h-20 md:w-32 md:h-32 mb-6">
             <div class="loading-ring"></div>
             <img src="https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png" alt="Loading Logo" class="w-full h-full object-contain rounded-full p-2 bg-black/60 shadow-[0_0_20px_rgba(0,150,255,0.4)]">
         </div>
-        <p class="text-[13px] md:text-xl font-semibold text-blue-400 tracking-widest animate-pulse drop-shadow-[0_0_8px_rgba(0,150,255,0.8)] text-center px-4">
-            server Ailabs sedang merender...
+        <!-- Teks dibuat dinamis untuk menunjukkan proses -->
+        <p id="loadingText" class="text-[13px] md:text-xl font-semibold text-blue-400 tracking-widest animate-pulse drop-shadow-[0_0_8px_rgba(0,150,255,0.8)] text-center px-4 max-w-lg">
+            Menyiapkan data Ailabs...
         </p>
     </div>
 
@@ -219,10 +244,12 @@
         </div>
     </div>
 
-    <!-- FIREBASE & LOGIC APLIKASI -->
+    <!-- FIREBASE SDK & MAGNIFIC LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Tambahkan import Firebase Storage untuk mengupload gambar dan video
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // Konfigurasi Firebase Bangpro
         const firebaseConfig = {
@@ -236,12 +263,10 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const storage = getStorage(app); // Inisialisasi Storage
 
-        // ==========================================
-        // PENTING: TARUH API KEY MOTION CONTROL KAMU DI SINI
-        // Nanti bisa digonta-ganti kalau dapet akun gratisan baru
-        // ==========================================
-        const MOTION_API_KEY = "MASUKAN_API_KEY_KAMU_DISINI";
+        // Variabel untuk menyimpan API Key dari input user
+        window.currentApiKey = "";
 
         // UI Functions
         window.showMessage = function(title, text) {
@@ -258,7 +283,7 @@
             msgBox.classList.remove('flex');
         };
 
-        // --- SISTEM LOGIN (MEMBACA DARI DATABASE ADMIN) ---
+        // --- SISTEM LOGIN ---
         window.verifyAccess = async function() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const btn = document.getElementById('verifyBtn');
@@ -272,26 +297,34 @@
             btn.disabled = true;
 
             try {
-                // Mengecek ke koleksi 'authorizedUsers' yang dibuat di web Admin
                 const userRef = doc(db, "authorizedUsers", email);
                 const docSnap = await getDoc(userRef);
 
                 if (docSnap.exists()) {
-                    // Berhasil Login
-                    // --- TRACKING: Update waktu terakhir aktif ---
                     try {
-                        await updateDoc(userRef, {
-                            lastActive: new Date().toLocaleString('id-ID')
-                        });
+                        await updateDoc(userRef, { lastActive: new Date().toLocaleString('id-ID') });
                     } catch (e) { console.error("Gagal update lastActive", e); }
 
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
                     document.getElementById('activeUserEmail').innerText = email;
                     
+                    // Muat API Key dari Local Storage jika sudah ada
+                    const savedKey = localStorage.getItem('magnificApiKey');
+                    if(savedKey) {
+                        document.getElementById('appApiKey').value = savedKey;
+                        window.currentApiKey = savedKey;
+                        document.getElementById('apiKeyStatus').innerText = "Status: API Key Tersimpan ✓";
+                        document.getElementById('apiKeyStatus').className = "text-xs text-green-400 mt-2";
+                    } else {
+                        document.getElementById('appApiKey').value = "";
+                        window.currentApiKey = "";
+                        document.getElementById('apiKeyStatus').innerText = "Status: Belum tersimpan";
+                        document.getElementById('apiKeyStatus').className = "text-xs text-red-400 mt-2";
+                    }
+                    
                     window.showMessage("Akses Diberikan!", "Selamat datang di Ailabs Motion Control. Sistem siap digunakan.");
                 } else {
-                    // Gagal Login
                     window.showMessage("Akses Ditolak!", "Email belum terdaftar di sistem Ailabs. Hubungi Admin Bangpro.");
                 }
             } catch (error) {
@@ -303,9 +336,29 @@
             }
         };
 
-        // --- FUNGSI LOGOUT ---
+        window.saveApiKey = function() {
+            const key = document.getElementById('appApiKey').value.trim();
+            if(key) {
+                localStorage.setItem('magnificApiKey', key);
+                window.currentApiKey = key;
+                document.getElementById('apiKeyStatus').innerText = "Status: API Key Tersimpan ✓";
+                document.getElementById('apiKeyStatus').className = "text-xs text-green-400 mt-2";
+                window.showMessage("Tersimpan", "API Key berhasil disimpan di browser Anda.");
+            } else {
+                window.showMessage("Peringatan", "API Key tidak boleh kosong!");
+            }
+        };
+
+        window.deleteApiKey = function() {
+            document.getElementById('appApiKey').value = "";
+            localStorage.removeItem('magnificApiKey');
+            window.currentApiKey = "";
+            document.getElementById('apiKeyStatus').innerText = "Status: Belum tersimpan";
+            document.getElementById('apiKeyStatus').className = "text-xs text-red-400 mt-2";
+            window.showMessage("Dihapus", "API Key berhasil dihapus. Silakan masukkan API Key yang baru.");
+        };
+
         window.logout = function() {
-            // Reset input file
             document.getElementById('photoInput').value = "";
             document.getElementById('videoInput').value = "";
             document.getElementById('photoDefault').classList.remove('hidden');
@@ -315,12 +368,10 @@
             document.getElementById('resultContainer').classList.add('hidden');
             document.getElementById('resultContainer').classList.remove('flex');
 
-            // Switch screen
             document.getElementById('appSection').classList.add('hidden');
             document.getElementById('authSection').classList.remove('hidden');
         };
 
-        // --- LOGIC APLIKASI MOTION CONTROL ---
         window.handlePhotoUpload = function(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
@@ -349,55 +400,158 @@
             }
         };
 
-        window.startGeneration = function() {
+        // --- SISTEM GENERATE (FIREBASE STORAGE + MAGNIFIC API) ---
+        window.startGeneration = async function() {
             const photoInput = document.getElementById('photoInput');
             const videoInput = document.getElementById('videoInput');
+            const appApiKeyInput = document.getElementById('appApiKey').value.trim();
+            const modelSelect = document.getElementById('modelSelect').value;
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
 
             if(photoInput.files.length === 0 || videoInput.files.length === 0) {
                 window.showMessage("Peringatan", "Brow, pastikan Foto dan Video referensinya sudah di-upload dulu ya!");
                 return;
             }
 
+            if(!appApiKeyInput) {
+                window.showMessage("Peringatan", "API Key Magnific wajib diisi sebelum Generate!");
+                document.getElementById('appApiKey').focus();
+                return;
+            }
+
+            // Otomatis simpan API Key jika belum disave saat klik generate
+            if(appApiKeyInput !== window.currentApiKey) {
+                window.currentApiKey = appApiKeyInput;
+                localStorage.setItem('magnificApiKey', appApiKeyInput);
+                document.getElementById('apiKeyStatus').innerText = "Status: API Key Tersimpan ✓";
+                document.getElementById('apiKeyStatus').className = "text-xs text-green-400 mt-2";
+            }
+
             document.getElementById('resultContainer').classList.add('hidden');
             document.getElementById('resultContainer').classList.remove('flex');
-
-            const loadingOverlay = document.getElementById('loadingOverlay');
+            
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
 
-            // Di sini nantinya API Key `MOTION_API_KEY` akan dikirim ke server saat melakukan request
-            console.log("Menggunakan API Key:", MOTION_API_KEY);
+            try {
+                const photoFile = photoInput.files[0];
+                const videoFile = videoInput.files[0];
+                const timestamp = Date.now();
 
-            // Simulasi proses render menggunakan API Key
-            setTimeout(async () => {
+                // 1. UPLOAD FILE KE FIREBASE STORAGE
+                loadingText.innerText = "Mengunggah bahan ke Firebase Storage...";
+                
+                const photoRef = ref(storage, `motion_inputs/${timestamp}_${photoFile.name}`);
+                await uploadBytesResumable(photoRef, photoFile);
+                const photoPublicUrl = await getDownloadURL(photoRef);
+
+                const videoRef = ref(storage, `motion_inputs/${timestamp}_${videoFile.name}`);
+                await uploadBytesResumable(videoRef, videoFile);
+                const videoPublicUrl = await getDownloadURL(videoRef);
+
+                // 2. TEMBAK MAGNIFIC API (START TASK DENGAN MODEL DINAMIS)
+                const modelName = modelSelect === 'pro' ? 'Kling 3 Pro' : 'Kling 3 Standard';
+                loadingText.innerText = `Meminta AI Magnific merender menggunakan ${modelName} (Mode Face Lock Ketat)...`;
+                
+                // Base URL menyesuaikan dengan model yang dipilih
+                const apiBaseUrl = modelSelect === 'pro' 
+                    ? 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-pro' 
+                    : 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std';
+
+                // Menerapkan instruksi Face Lock dari Bangpro secara otomatis di prompt
+                const strictPrompt = "highly detailed, photorealistic, strict face lock, perfectly preserve facial features and identity of the reference image, seamless motion transfer";
+
+                const startResponse = await fetch(apiBaseUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-magnific-api-key': window.currentApiKey
+                    },
+                    body: JSON.stringify({
+                        image_url: photoPublicUrl,
+                        video_url: videoPublicUrl,
+                        prompt: strictPrompt,
+                        character_orientation: "video",
+                        cfg_scale: 0.5
+                    })
+                });
+
+                if (!startResponse.ok) {
+                    const errObj = await startResponse.json();
+                    throw new Error(errObj.message || `Gagal memulai tugas di server Magnific (${modelName}).`);
+                }
+
+                const startData = await startResponse.json();
+                
+                // Mendapatkan Task ID sesuai spesifikasi response body
+                const taskId = startData.data?.task_id || startData.task_id; 
+                if (!taskId) throw new Error("Task ID tidak didapatkan dari server.");
+
+                // 3. POLLING (MENGECEK STATUS RENDER TERUS MENERUS)
+                // Sesuai docs: "CREATED", "IN_PROGRESS", "COMPLETED", "FAILED"
+                loadingText.innerText = `Video sedang dirender oleh ${modelName}. Mohon tunggu (bisa memakan waktu 1-3 menit)...`;
+                
+                const checkTaskStatus = async () => {
+                    const statusResponse = await fetch(`${apiBaseUrl}/${taskId}`, {
+                        method: 'GET',
+                        headers: { 'x-magnific-api-key': window.currentApiKey }
+                    });
+
+                    if (!statusResponse.ok) throw new Error("Gagal mengecek status tugas.");
+
+                    const statusData = await statusResponse.json();
+                    const currentStatus = statusData.data?.status || statusData.status;
+
+                    if (currentStatus === "COMPLETED") {
+                        // RENDER SUKSES
+                        const resultUrl = statusData.data?.generated?.[0];
+                        if (!resultUrl) throw new Error("URL Hasil Video tidak ditemukan.");
+
+                        loadingOverlay.classList.add('hidden');
+                        loadingOverlay.classList.remove('flex');
+
+                        // Tambah Poin Render di Database Admin
+                        try {
+                            const activeEmail = document.getElementById('activeUserEmail').innerText;
+                            const userRef = doc(db, "authorizedUsers", activeEmail);
+                            await updateDoc(userRef, { usageCount: increment(1) });
+                        } catch (e) { console.error("Gagal update aktivitas", e); }
+
+                        // Tampilkan Hasil
+                        const resultContainer = document.getElementById('resultContainer');
+                        const resultVideo = document.getElementById('resultVideo');
+                        const downloadBtn = document.getElementById('downloadBtn');
+                        
+                        resultVideo.src = resultUrl;
+                        downloadBtn.href = resultUrl;
+                        
+                        resultContainer.classList.remove('hidden');
+                        resultContainer.classList.add('flex');
+                        resultContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+                        window.showMessage("Berhasil!", "Video Motion Control telah selesai dengan perlindungan wajah yang ketat!");
+
+                    } else if (currentStatus === "FAILED") {
+                        // RENDER GAGAL DARI SANANYA
+                        loadingOverlay.classList.add('hidden');
+                        loadingOverlay.classList.remove('flex');
+                        window.showMessage("Render Gagal", "Server AI Magnific menolak atau gagal memproses video.");
+                    } else {
+                        // MASIH PROSES (CREATED / IN_PROGRESS) -> Ulangi cek 5 detik lagi
+                        setTimeout(checkTaskStatus, 5000);
+                    }
+                };
+
+                // Mulai pengecekan pertama setelah 5 detik
+                setTimeout(checkTaskStatus, 5000);
+
+            } catch (error) {
+                console.error("Proses Error: ", error);
                 loadingOverlay.classList.add('hidden');
                 loadingOverlay.classList.remove('flex');
-
-                // --- TRACKING: Tambah jumlah render user ---
-                try {
-                    const activeEmail = document.getElementById('activeUserEmail').innerText;
-                    const userRef = doc(db, "authorizedUsers", activeEmail);
-                    await updateDoc(userRef, {
-                        usageCount: increment(1),
-                        lastActive: new Date().toLocaleString('id-ID')
-                    });
-                } catch (e) { console.error("Gagal update aktivitas", e); }
-                
-                const resultContainer = document.getElementById('resultContainer');
-                const resultVideo = document.getElementById('resultVideo');
-                const downloadBtn = document.getElementById('downloadBtn');
-                
-                const generatedVideoURL = URL.createObjectURL(videoInput.files[0]);
-                
-                resultVideo.src = generatedVideoURL;
-                downloadBtn.href = generatedVideoURL;
-                
-                resultContainer.classList.remove('hidden');
-                resultContainer.classList.add('flex');
-                resultContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
-                window.showMessage("Berhasil!", "Video Motion Control berhasil di-generate dengan mode Face Lock yang ketat.");
-            }, 5000);
+                window.showMessage("Kesalahan Sistem", error.message);
+            }
         };
     </script>
 </body>
