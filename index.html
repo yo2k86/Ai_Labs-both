@@ -248,8 +248,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // HAPUS IMPORT FIREBASE STORAGE, KITA SUDAH TIDAK PAKAI LAGI
-
         // Konfigurasi Firebase Bangpro (Hanya untuk Login / Cek Akses)
         const firebaseConfig = {
             apiKey: "AIzaSyAda9zOqMGJmIR0HmHTn0M32vvwH3y4mU4",
@@ -399,32 +397,71 @@
         };
 
         // ========================================================
-        // FUNGSI BARU: UPLOAD KE SERVER GRATIS (CATBOX.MOE)
-        // BEBAS CORS & TIDAK PERLU API KEY PENYIMPANAN
+        // FUNGSI KOMPRESI & UPLOAD VIA BACKEND VERCEL (/api/upload)
         // ========================================================
-        async function uploadToFreeServer(file) {
-            const formData = new FormData();
-            formData.append('reqtype', 'fileupload');
-            formData.append('fileToUpload', file);
-
-            try {
-                // Catbox.moe mengizinkan akses publik untuk diubah jadi link
-                const response = await fetch('https://catbox.moe/user/api.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error("Gagal mengunggah file ke server penyimpanan publik.");
+        function resizeImage(file, maxWidth, maxHeight) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        let width = img.width; let height = img.height;
+                        if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                        if (height > maxHeight) { width = Math.round((width * maxHeight) / height); height = maxHeight; }
+                        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    }
+                    img.src = e.target.result;
                 }
+                reader.readAsDataURL(file);
+            });
+        }
 
-                // Catbox mengembalikan URL langsung dalam bentuk teks (bukan JSON)
-                const publicUrl = await response.text();
-                return publicUrl;
-            } catch (err) {
-                console.error("Upload error:", err);
-                throw new Error("Sistem penyimpanan publik (Catbox) sedang menolak koneksi. Coba lagi nanti.");
+        window.compressVideoClientSide = async function(file) {
+            return new Promise((resolve, reject) => {
+                const video = document.createElement('video'); video.src = URL.createObjectURL(file); video.muted = true; video.playsInline = true;
+                video.onloadedmetadata = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_HEIGHT = 480; let scale = 1;
+                    if (video.videoHeight > MAX_HEIGHT) scale = MAX_HEIGHT / video.videoHeight;
+                    canvas.width = video.videoWidth * scale; canvas.height = video.videoHeight * scale;
+                    const ctx = canvas.getContext('2d');
+                    video.play().then(() => {
+                        const stream = canvas.captureStream(30); let recorder;
+                        try { recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8', videoBitsPerSecond: 1000000 }); } 
+                        catch (e) { recorder = new MediaRecorder(stream); }
+                        const chunks = [];
+                        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+                        recorder.onstop = () => { const blob = new Blob(chunks, { type: 'video/webm' }); resolve(blob); };
+                        recorder.start();
+                        const draw = () => { if (video.paused || video.ended) return; ctx.drawImage(video, 0, 0, canvas.width, canvas.height); requestAnimationFrame(draw); };
+                        draw();
+                        video.onended = () => { recorder.stop(); video.pause(); video.removeAttribute('src'); video.load(); };
+                    }).catch(err => reject(err));
+                };
+                video.onerror = () => reject("Error kompres video");
+            });
+        };
+
+        async function uploadViaBackend(base64Data, path, fileName) {
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ base64Data: base64Data, uploadPath: path, fileName: fileName })
+            });
+            
+            let result;
+            try { result = await response.json(); } 
+            catch (e) { throw new Error("Endpoint backend /api/upload tidak ditemukan atau error."); }
+
+            if (!response.ok || (!result.success && !result.data && !result.url)) {
+                throw new Error(result.msg || result.error || "Gagal upload ke backend.");
             }
+            
+            const directUrl = result.data?.downloadUrl || result.data?.fileUrl || result.url || result.data;
+            if (!directUrl || !directUrl.startsWith('http')) throw new Error("Format URL invalid dari server API.");
+            return directUrl;
         }
 
         // --- SISTEM GENERATE MOTION CONTROL DENGAN MAGNIFIC API ---
@@ -465,12 +502,19 @@
                 const photoFile = photoInput.files[0];
                 const videoFile = videoInput.files[0];
 
-                // 1. UPLOAD FILE KE SERVER PUBLIK (CATBOX) ALIH-ALIH FIREBASE
-                loadingText.innerText = "Mengunggah Foto Wajah ke server publik...";
-                const photoPublicUrl = await uploadToFreeServer(photoFile);
+                // 1. UPLOAD FILE KE BACKEND VERCEL (/api/upload)
+                loadingText.innerText = "Kompresi & Mengunggah Foto Wajah...";
+                const resizedImageB64 = await resizeImage(photoFile, 1024, 1024);
+                const photoPublicUrl = await uploadViaBackend(resizedImageB64, 'motion-images', `img_${Date.now()}.jpg`);
 
-                loadingText.innerText = "Mengunggah Video Referensi ke server publik (Bisa agak lama tergantung ukuran)...";
-                const videoPublicUrl = await uploadToFreeServer(videoFile);
+                loadingText.innerText = "Kompresi & Mengunggah Video (Menghindari Limit Server)...";
+                let finalVideoFile = videoFile;
+                if (videoFile.size > 3.5 * 1024 * 1024) {
+                    finalVideoFile = await window.compressVideoClientSide(videoFile);
+                    if (finalVideoFile.size > 4 * 1024 * 1024) throw new Error("Ukuran video masih terlalu besar setelah dikompresi.");
+                }
+                const videoB64 = await new Promise((res) => { const r = new FileReader(); r.onload = ()=>res(r.result); r.readAsDataURL(finalVideoFile); });
+                const videoPublicUrl = await uploadViaBackend(videoB64, 'motion-videos', `vid_${Date.now()}.${finalVideoFile.type === 'video/webm' ? 'webm' : 'mp4'}`);
 
                 // 2. TEMBAK MAGNIFIC API (START TASK DENGAN MODEL DINAMIS)
                 const modelName = modelSelect === 'pro' ? 'Kling 3 Pro' : 'Kling 3 Standard';
