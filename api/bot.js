@@ -1,27 +1,36 @@
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
+const admin = require('firebase-admin');
 
 // ==========================================
-// SIMULASI DATABASE & PENYIMPANAN SEMENTARA
-// (Nanti ini diganti dengan Firebase/Firestore agar permanen)
+// SETUP FIREBASE ADMIN SDK UNTUK BACKEND BOT
 // ==========================================
-
-// 1. Daftar Email yang diizinkan (Sinkron dengan Admin Panel)
-const authorizedEmails = [
-    'bangpro.vip@gmail.com',
-    'client.mbelgedez@gmail.com'
-];
-
-// 2. Data Sesi User yang sedang login di bot
-const loggedInUsers = {};
-
-// 3. API Key Motion Control masing-masing user
-const userApiKeys = {};
-
-// ==========================================
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            // Memastikan format private key terbaca dengan benar di Vercel
+            privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined
+        })
+    });
+}
+const db = admin.firestore();
 
 // Inisialisasi Bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// --- FUNGSI BANTUAN UNTUK CEK LOGIN ---
+// Mengambil data sesi dari Firestore
+async function getAuthEmail(userId) {
+    try {
+        const doc = await db.collection('botSessions').doc(userId.toString()).get();
+        return doc.exists ? doc.data().email : null;
+    } catch (error) {
+        console.error("Error checking auth:", error);
+        return null;
+    }
+}
 
 // --- START COMMAND ---
 bot.start((ctx) => {
@@ -34,8 +43,8 @@ bot.start((ctx) => {
     );
 });
 
-// --- FITUR LOGIN (WAJIB) ---
-bot.command('login', (ctx) => {
+// --- FITUR LOGIN (TERHUBUNG FIRESTORE) ---
+bot.command('login', async (ctx) => {
     const email = ctx.message.text.replace('/login', '').trim().toLowerCase();
     const userId = ctx.from.id;
 
@@ -43,28 +52,47 @@ bot.command('login', (ctx) => {
         return ctx.replyWithMarkdown(`Masukkan email kamu, brow!\n\n*Contoh:*\n\`/login emailkamu@gmail.com\``);
     }
 
-    // Cek apakah email ada di daftar authorized
-    if (authorizedEmails.includes(email)) {
-        loggedInUsers[userId] = email;
-        ctx.replyWithMarkdown(
-            `✅ *Akses Diberikan!*\n\nSelamat datang, *${email}*. Akses kamu berhasil diverifikasi.\n\n` +
-            `Sekarang kamu bisa menggunakan perintah:\n` +
-            `🖼️ /image [prompt] - Generate Gambar AI\n` +
-            `🎬 /video - Menu Pembuatan Video AI\n` +
-            `🔑 /setapikey [key] - Set API Motion Control`
-        );
-    } else {
-        ctx.replyWithMarkdown(
-            `⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs. Silakan hubungi Admin Bangpro untuk mendaftarkan email kamu.`
-        );
+    const loadingMsg = await ctx.reply('⏳ Sedang memverifikasi akses ke database Ailabs...');
+
+    try {
+        // Cek apakah email ada di koleksi "authorizedUsers" (yang diinput via Web Admin)
+        const userDoc = await db.collection('authorizedUsers').doc(email).get();
+
+        if (userDoc.exists) {
+            // Jika terdaftar, simpan sesi userId di koleksi "botSessions"
+            await db.collection('botSessions').doc(userId.toString()).set({
+                email: email,
+                loginAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            ctx.replyWithMarkdown(
+                `✅ *Akses Diberikan!*\n\nSelamat datang, *${email}*. Akses kamu berhasil diverifikasi.\n\n` +
+                `Sekarang kamu bisa menggunakan perintah:\n` +
+                `🖼️ /image [prompt] - Generate Gambar AI\n` +
+                `🎬 /video - Menu Pembuatan Video AI\n` +
+                `🔑 /setapikey [key] - Set API Motion Control`
+            );
+        } else {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            ctx.replyWithMarkdown(
+                `⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs. Silakan hubungi Admin Bangpro untuk mendaftarkan email kamu.`
+            );
+        }
+    } catch (error) {
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+        ctx.reply('Ada kesalahan teknis saat menghubungi server database. Coba lagi nanti.');
+        console.error(error);
     }
 });
 
 // --- FITUR LOGOUT ---
-bot.command('logout', (ctx) => {
+bot.command('logout', async (ctx) => {
     const userId = ctx.from.id;
-    if (loggedInUsers[userId]) {
-        delete loggedInUsers[userId];
+    const email = await getAuthEmail(userId);
+    
+    if (email) {
+        await db.collection('botSessions').doc(userId.toString()).delete();
         ctx.reply('🔒 Kamu telah keluar dari sistem Ailabs. Silakan /login kembali untuk menggunakan bot.');
     } else {
         ctx.reply('Kamu belum login, brow.');
@@ -72,45 +100,51 @@ bot.command('logout', (ctx) => {
 });
 
 // --- CUSTOM GREETINGS & BANTUAN ---
-bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], (ctx) => {
-    ctx.replyWithMarkdown(
-        `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu, brow? 🤖\n\n` +
-        `Ketik /login [email] untuk membuka akses fitur,\n` +
-        `Ketik /image [prompt] untuk mulai generate gambar AI,\n` +
-        `Atau ketik /video untuk masuk ke menu pembuatan video.`
-    );
+bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
+    const email = await getAuthEmail(ctx.from.id);
+    let msg = `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu, brow? 🤖\n\n`;
+    
+    if (email) {
+        msg += `Ketik /image [prompt] untuk mulai generate gambar AI,\nAtau ketik /video untuk masuk ke menu pembuatan video.`;
+    } else {
+        msg += `Ketik /login [email] untuk membuka akses fitur.`;
+    }
+    
+    ctx.replyWithMarkdown(msg);
 });
 
 // --- FITUR SET API KEY MOTION CONTROL ---
-bot.command('setapikey', (ctx) => {
-    // PROTEKSI: Cek Login
-    if (!loggedInUsers[ctx.from.id]) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
+bot.command('setapikey', async (ctx) => {
+    const userId = ctx.from.id;
+    const email = await getAuthEmail(userId);
+    if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
     const apiKey = ctx.message.text.replace('/setapikey', '').trim();
-    const userId = ctx.from.id;
 
     if (!apiKey) {
         return ctx.replyWithMarkdown(`Ketik perintahnya beserta API Key kamu ya.\n*Contoh:*\n\`/setapikey abs123456789xyz\``);
     }
 
-    userApiKeys[userId] = apiKey;
+    // Simpan API Key ke database Firestore
+    await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
     ctx.replyWithMarkdown(`✅ *API Key Berhasil Disimpan untuk Motion Control!*`);
 });
 
-bot.command('resetapikey', (ctx) => {
+bot.command('resetapikey', async (ctx) => {
     const userId = ctx.from.id;
-    if (userApiKeys[userId]) {
-        delete userApiKeys[userId];
+    try {
+        await db.collection('apiKeys').doc(userId.toString()).delete();
         ctx.replyWithMarkdown(`🗑️ *API Key Berhasil Direset!*`);
-    } else {
-        ctx.reply('Kamu belum menyimpan API Key apapun.');
+    } catch (e) {
+        ctx.reply('Gagal mereset atau kamu belum menyimpan API Key apapun.');
     }
 });
 
 // --- FITUR GENERATE IMAGE ---
 bot.command('image', async (ctx) => {
-    // PROTEKSI: Cek Login
-    if (!loggedInUsers[ctx.from.id]) {
+    const userId = ctx.from.id;
+    const email = await getAuthEmail(userId);
+    if (!email) {
         return ctx.replyWithMarkdown(`⛔ *Akses Terkunci!*\nKamu harus login dengan email yang terdaftar. Gunakan perintah:\n\`/login emailkamu@gmail.com\``);
     }
 
@@ -122,7 +156,7 @@ bot.command('image', async (ctx) => {
     const loadingMsg = await ctx.reply(`⏳ Ailabs gen pro sedang merender gambar untuk: "${userPrompt}"...`);
 
     try {
-        // Face Lock Aktif (sesuai request untuk selalu menjaga konsistensi wajah)
+        // Mode konsistensi wajah yang ketat aktif:
         const finalPrompt = `${userPrompt}, highly detailed, photorealistic, cinematic lighting, consistent facial structure, face lock, perfect skin texture, 8k`;
 
         const response = await axios.post(
@@ -140,7 +174,7 @@ bot.command('image', async (ctx) => {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         await ctx.replyWithPhoto(
             { source: Buffer.from(response.data) },
-            { caption: `🎨 Prompt: ${userPrompt}\n👤 Di-generate oleh: ${loggedInUsers[ctx.from.id]}\n\n✨ Aplikasi oleh Bangpro` }
+            { caption: `🎨 Prompt: ${userPrompt}\n👤 Di-generate oleh: ${email}\n\n✨ Aplikasi oleh Bangpro` }
         );
 
     } catch (error) {
@@ -151,9 +185,9 @@ bot.command('image', async (ctx) => {
 });
 
 // --- FITUR MENU VIDEO ---
-bot.command('video', (ctx) => {
-    // PROTEKSI: Cek Login
-    if (!loggedInUsers[ctx.from.id]) {
+bot.command('video', async (ctx) => {
+    const email = await getAuthEmail(ctx.from.id);
+    if (!email) {
         return ctx.replyWithMarkdown(`⛔ *Akses Terkunci!*\nKamu harus login dengan email yang terdaftar. Gunakan perintah:\n\`/login emailkamu@gmail.com\``);
     }
 
@@ -170,24 +204,28 @@ bot.command('video', (ctx) => {
 });
 
 // --- HANDLING TOMBOL ---
-bot.action('model_motion', (ctx) => { 
+bot.action('model_motion', async (ctx) => { 
     ctx.answerCbQuery(); 
     const userId = ctx.from.id;
 
-    // Proteksi di dalam callback juga
-    if (!loggedInUsers[userId]) return ctx.reply('⛔ Sesi expired, silakan /login kembali.');
+    const email = await getAuthEmail(userId);
+    if (!email) return ctx.reply('⛔ Sesi expired, silakan /login kembali.');
 
-    if (!userApiKeys[userId]) {
+    // Cek API Key dari database
+    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+    
+    if (!keyDoc.exists) {
         return ctx.replyWithMarkdown(`⚠️ Kamu belum memasukkan API Key untuk Motion Control.\nSilakan masukkan API key kamu:\n\`/setapikey [API_KEY_KAMU]\``);
     }
 
-    const activeKey = userApiKeys[userId];
+    const activeKey = keyDoc.data().key;
     ctx.reply(`Sistem memproses Motion Control dengan API Key kamu... (Key aktif: ${activeKey.substring(0, 5)}***) ⏳`); 
 });
 
-bot.action('model_ltx', (ctx) => { 
+bot.action('model_ltx', async (ctx) => { 
     ctx.answerCbQuery(); 
-    if (!loggedInUsers[ctx.from.id]) return;
+    const email = await getAuthEmail(ctx.from.id);
+    if (!email) return;
     ctx.reply('Fitur LTX 2.0 segera hadir untuk Mbelgedez Squad! ⚡'); 
 });
 
