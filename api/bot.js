@@ -120,7 +120,7 @@ bot.command('apikey', async (ctx) => {
     if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    let status = keyDoc.exists ? "✅ Tersimpan" : "❌ Belum ada";
+    let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
 
     ctx.replyWithMarkdown(
         `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
@@ -133,8 +133,8 @@ bot.command('apikey', async (ctx) => {
 
 bot.action('action_set_apikey', async (ctx) => {
     ctx.answerCbQuery();
-    ctx.reply(
-        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:',
+    ctx.replyWithMarkdown(
+        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:\n\n_(Atau jika mode reply hilang saat mem-paste, ketik saja manual format ini: /setkey API_KEY_KAMU)_',
         Markup.forceReply()
     );
 });
@@ -157,16 +157,58 @@ bot.action('action_delete_apikey', async (ctx) => {
     }
 });
 
-// Listener untuk menangkap input API Key dari balasan (reply)
+// --- FALLBACK COMMAND (Jika gagal lewat reply) ---
+bot.command('setkey', async (ctx) => {
+    const userId = ctx.from.id;
+    const email = await getAuthEmail(userId);
+    if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
+
+    const apiKey = ctx.message.text.replace('/setkey', '').trim();
+    if (!apiKey) {
+        return ctx.reply('⚠️ Format salah! Gunakan perintah seperti ini: /setkey abcdef12345');
+    }
+
+    const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key ke server Magnific...');
+    try {
+        // Test API Key dengan menembak list tasks Magnific
+        await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', {
+            headers: { 'x-magnific-api-key': apiKey }
+        });
+        
+        await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+        return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+    } catch (error) {
+        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+        return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nAPI Key tidak valid. Silakan periksa kembali API Key Magnific kamu.`);
+    }
+});
+
+// --- Listener untuk menangkap input API Key dari balasan (reply) ---
 bot.on('text', async (ctx, next) => {
-    if (ctx.message.reply_to_message && ctx.message.reply_to_message.text && ctx.message.reply_to_message.text.includes('Silakan balas (reply) pesan ini dengan API Key Magnific kamu:')) {
+    const isReply = ctx.message.reply_to_message && ctx.message.reply_to_message.text;
+    
+    if (isReply && ctx.message.reply_to_message.text.includes('Silakan balas (reply) pesan ini dengan API Key Magnific kamu')) {
         const userId = ctx.from.id;
         const email = await getAuthEmail(userId);
         if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
         const apiKey = ctx.message.text.trim();
-        await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-        return ctx.replyWithMarkdown(`✅ *API Key Berhasil Disimpan!*\n\nSekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+        const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key ke server Magnific...');
+        
+        try {
+            // Test API Key dengan menembak list tasks Magnific
+            await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', {
+                headers: { 'x-magnific-api-key': apiKey }
+            });
+            
+            await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+        } catch (error) {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nAPI Key tidak valid. Silakan periksa kembali API Key Magnific kamu.`);
+        }
     }
     return next();
 });
@@ -265,7 +307,7 @@ bot.action('menu_apikey', async (ctx) => {
     ctx.answerCbQuery();
     const userId = ctx.from.id;
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    let status = keyDoc.exists ? "✅ Tersimpan" : "❌ Belum ada";
+    let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
 
     ctx.replyWithMarkdown(
         `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
