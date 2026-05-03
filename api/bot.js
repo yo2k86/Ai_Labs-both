@@ -65,7 +65,8 @@ bot.command('login', async (ctx) => {
                 `Sekarang kamu bisa menggunakan perintah:\n` +
                 `🖼️ /image [prompt] - Generate Gambar AI\n` +
                 `🎬 /video - Menu Pembuatan Video AI\n` +
-                `🔑 /apikey - Pengaturan API Key Magnific`
+                `🔑 /apikey - Pengaturan API Key Magnific\n` +
+                `📜 /history - Cek 5 Riwayat Video Terakhir`
             );
         } else {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
@@ -93,7 +94,7 @@ bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
     const email = await getAuthEmail(ctx.from.id);
     let msg = `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu? 🤖\n\n`;
     if (email) {
-        msg += `Ketik /image [prompt] untuk mulai generate gambar AI,\nAtau ketik /video untuk masuk ke menu video.`;
+        msg += `Ketik /image [prompt] untuk mulai generate gambar AI,\nAtau ketik /video untuk masuk ke menu video.\nKetik /history untuk riwayat video.`;
     } else {
         msg += `Ketik /login [email] untuk membuka akses fitur.`;
     }
@@ -164,7 +165,6 @@ bot.command('setkey', async (ctx) => {
             return ctx.replyWithMarkdown(`❌ *API Key Ditolak!* Unauthorized.`);
         } else if (error.response) {
             await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-            // Hapus Markdown agar pesan error asli server tidak bentrok format
             return ctx.reply(`✅ API Key Disimpan (Catatan)\nSistem menerima limitasi akun: "${error.response.data?.message}"`);
         } else {
             return ctx.reply(`❌ Koneksi Gagal ke Magnific.`);
@@ -320,7 +320,7 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
             const activeKey = keyDoc.data().key;
 
-            // Proses Request POST
+            // Proses Request POST ke API
             const response = await axios.post(
                 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
                 { image_url: imageUrl, video_url: videoUrl },
@@ -337,7 +337,6 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             await db.collection('userStates').doc(userId.toString()).delete(); 
 
             if (taskId) {
-                // BUG FIX: Mengganti format `_in_progress_` yang error di Markdown
                 await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     loadingMsg.message_id,
@@ -358,7 +357,6 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
 
         } catch (error) {
             const errMsg = error.response?.data?.message || error.message;
-            // Menghilangkan Markdown di pesan error untuk menghindari crash jika message asli mengandung simbol aneh
             await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ Gagal mengirim tugas\nError: ${errMsg}`);
         }
     }
@@ -366,7 +364,7 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
 });
 
 // ==========================================
-// 4. LOGIKA TOMBOL LACAK TASK & ERROR HANDLING VIDEO BESAR
+// LOGIKA TOMBOL LACAK TASK & AUTO-UPLOAD PIXELDRAIN
 // ==========================================
 bot.action(/^track_(.+)$/, async (ctx) => {
     ctx.answerCbQuery('Mengecek status di server...'); 
@@ -395,18 +393,55 @@ bot.action(/^track_(.+)$/, async (ctx) => {
             const videoUrl = taskData.generated[0]; 
             
             try {
-                await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, parse_mode: 'Markdown' });
-            } catch (videoError) {
-                ctx.replyWithMarkdown(
-                    `⚠️ *File terlalu besar untuk dikirim langsung via Telegram.*\n\n` +
-                    `🔗 *Link Permanen (Download Langsung):*\n${videoUrl}\n\n` +
-                    `Silakan klik tombol di bawah ini untuk mengunduh videonya brow!`,
-                    Markup.inlineKeyboard([[Markup.button.url('📥 Download Video', videoUrl)]])
+                // Kirim Video ke Telegram DAN SELALU kasih tombol Download Asli
+                await ctx.replyWithVideo(
+                    { url: videoUrl }, 
+                    { 
+                        caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, 
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [Markup.button.url('📥 Download Video Asli', videoUrl)]
+                            ]
+                        }
+                    }
                 );
+            } catch (videoError) {
+                // JIKA GAGAL DIKIRIM (KARENA FILE > 50MB), Backup ke Pixeldrain
+                const waitMsg = await ctx.reply('⚠️ Ukuran video terlalu besar (>50MB) untuk Telegram. \n⏳ Bot sedang mengupload ke Pixeldrain agar mudah didownload...');
+                
+                try {
+                    const vidBuffer = await axios.get(videoUrl, { responseType: 'arraybuffer' });
+                    const uploadRes = await axios.post('https://pixeldrain.com/api/file', vidBuffer.data, {
+                        headers: { 'Content-Type': 'video/mp4' }
+                    });
+                    
+                    await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
+                    
+                    if (uploadRes.data && uploadRes.data.success) {
+                        const pdLink = `https://pixeldrain.com/api/file/${uploadRes.data.id}`;
+                        ctx.replyWithMarkdown(
+                            `✅ *Video Berhasil Dibackup!*\n\n` +
+                            `File terlalu besar untuk dikirim langsung via Telegram.\n\n` +
+                            `🔗 *Link Download Pixeldrain:*\n${pdLink}\n\n` +
+                            `_Silakan klik tombol di bawah ini. Nanti di web Pixeldrain, tinggal klik tombol Download._`,
+                            Markup.inlineKeyboard([[Markup.button.url('📥 Download via Pixeldrain', pdLink)]])
+                        );
+                    } else {
+                        throw new Error('Upload Pixeldrain gagal');
+                    }
+                } catch (pdError) {
+                    await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
+                    ctx.replyWithMarkdown(
+                        `⚠️ *File terlalu besar dan backup ke Pixeldrain gagal.*\n\n` +
+                        `🔗 *Link Asli Magnific:*\n${videoUrl}\n\n` +
+                        `_(Copy link ini dan buka manual di browser Chrome/Safari untuk mendownload)_`,
+                        Markup.inlineKeyboard([[Markup.button.url('🌐 Buka Link Asli', videoUrl)]])
+                    );
+                }
             }
         } 
         else if (status === 'IN_PROGRESS' || status === 'CREATED') { 
-            // BUG FIX: Mengganti underscore di status (cth: IN_PROGRESS menjadi IN PROGRESS)
             const cleanStatus = status.replace(/_/g, ' ');
             ctx.replyWithMarkdown(
                 `🔄 *Status AI: ${cleanStatus}*\n\n` +
@@ -444,6 +479,60 @@ bot.command('lacak', async (ctx) => {
             [Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]
         ])
     );
+});
+
+// ==========================================
+// FITUR BARU: CEK RIWAYAT TASK (HISTORY) DARI SERVER
+// ==========================================
+bot.command('history', async (ctx) => {
+    await ctx.sendChatAction('typing');
+    const userId = ctx.from.id;
+
+    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+    if (!keyDoc.exists) return ctx.reply('⚠️ API Key belum diatur. Gunakan /apikey');
+    const activeKey = keyDoc.data().key;
+
+    const loadingMsg = await ctx.reply('⏳ Mengambil riwayat dari server Magnific...');
+
+    try {
+        const response = await axios.get(
+            'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
+            { headers: { 'x-magnific-api-key': activeKey } } 
+        );
+
+        const tasks = response.data?.data; 
+        
+        if (!tasks || tasks.length === 0) {
+            return ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, '📭 Kamu belum memiliki riwayat pembuatan video.');
+        }
+
+        // Ambil maksimal 5 tugas terakhir biar chat nggak kepanjangan
+        const recentTasks = tasks.slice(0, 5);
+        let replyText = `📜 *5 Riwayat Video Terakhir Kamu:*\n\n`;
+        let buttons = [];
+
+        recentTasks.forEach((task, index) => {
+            const cleanStatus = task.status.replace(/_/g, ' '); 
+            replyText += `${index + 1}. \`${task.task_id}\`\nStatus: *${cleanStatus}*\n\n`; 
+            
+            buttons.push([Markup.button.callback(`🔍 Cek Video ${index + 1}`, `track_${task.task_id}`)]); 
+        });
+
+        await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            loadingMsg.message_id,
+            undefined,
+            replyText,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: buttons }
+            }
+        );
+
+    } catch (error) {
+        const errMsg = error.response?.data?.message || error.message;
+        await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ Gagal mengambil riwayat.\nError: ${errMsg}`);
+    }
 });
 
 // === PENGGANTI bot.launch() UNTUK VERCEL ===
