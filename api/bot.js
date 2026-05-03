@@ -71,7 +71,7 @@ bot.command('login', async (ctx) => {
                 `Sekarang kamu bisa menggunakan perintah:\n` +
                 `🖼️ /image [prompt] - Generate Gambar AI\n` +
                 `🎬 /video - Menu Pembuatan Video AI\n` +
-                `🔑 /setapikey [key] - Set API Motion Control`
+                `🔑 /apikey - Pengaturan API Key Magnific`
             );
         } else {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
@@ -113,31 +113,62 @@ bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
     ctx.replyWithMarkdown(msg);
 });
 
-// --- FITUR SET API KEY MOTION CONTROL ---
-bot.command('setapikey', async (ctx) => {
+// --- FITUR PENGATURAN API KEY (DENGAN TOMBOL UI) ---
+bot.command('apikey', async (ctx) => {
     const userId = ctx.from.id;
     const email = await getAuthEmail(userId);
     if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
-    const apiKey = ctx.message.text.replace('/setapikey', '').trim();
+    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+    let status = keyDoc.exists ? "✅ Tersimpan" : "❌ Belum ada";
 
-    if (!apiKey) {
-        return ctx.replyWithMarkdown(`Ketik perintahnya beserta API Key kamu ya.\n*Contoh:*\n\`/setapikey abs123456789xyz\``);
-    }
-
-    // Simpan API Key ke database Firestore
-    await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-    ctx.replyWithMarkdown(`✅ *API Key Berhasil Disimpan untuk Motion Control!*`);
+    ctx.replyWithMarkdown(
+        `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
+        Markup.inlineKeyboard([
+            [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
+            [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
+        ])
+    );
 });
 
-bot.command('resetapikey', async (ctx) => {
+bot.action('action_set_apikey', async (ctx) => {
+    ctx.answerCbQuery();
+    ctx.reply(
+        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:',
+        Markup.forceReply()
+    );
+});
+
+bot.action('action_delete_apikey', async (ctx) => {
     const userId = ctx.from.id;
     try {
         await db.collection('apiKeys').doc(userId.toString()).delete();
-        ctx.replyWithMarkdown(`🗑️ *API Key Berhasil Direset!*`);
+        ctx.answerCbQuery('🗑️ API Key berhasil dihapus!', { show_alert: true });
+        ctx.editMessageText('🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ❌ Belum ada\n\nPilih aksi di bawah ini:', {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '➕ Masukkan / Ganti API Key', callback_data: 'action_set_apikey' }]
+                ]
+            }
+        });
     } catch (e) {
-        ctx.reply('Gagal mereset atau kamu belum menyimpan API Key apapun.');
+        ctx.answerCbQuery('Gagal menghapus API Key.', { show_alert: true });
     }
+});
+
+// Listener untuk menangkap input API Key dari balasan (reply)
+bot.on('text', async (ctx, next) => {
+    if (ctx.message.reply_to_message && ctx.message.reply_to_message.text && ctx.message.reply_to_message.text.includes('Silakan balas (reply) pesan ini dengan API Key Magnific kamu:')) {
+        const userId = ctx.from.id;
+        const email = await getAuthEmail(userId);
+        if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
+
+        const apiKey = ctx.message.text.trim();
+        await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
+        return ctx.replyWithMarkdown(`✅ *API Key Berhasil Disimpan!*\n\nSekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+    }
+    return next();
 });
 
 // --- FITUR GENERATE IMAGE ---
@@ -198,6 +229,7 @@ bot.command('video', async (ctx) => {
             [Markup.button.url('👤 Follow Admin (Wajib)', 'https://www.facebook.com/profile.php?id=61556333717173')],
             [Markup.button.callback('🎭 Motion Control', 'model_motion')],
             [Markup.button.callback('⚡ LTX 2.0', 'model_ltx')],
+            [Markup.button.callback('🔑 Pengaturan API Key', 'menu_apikey')],
             [Markup.button.callback('⬅️ Kembali', 'main_menu')]
         ])
     );
@@ -215,7 +247,7 @@ bot.action('model_motion', async (ctx) => {
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
     
     if (!keyDoc.exists) {
-        return ctx.replyWithMarkdown(`⚠️ Kamu belum memasukkan API Key untuk Motion Control.\nSilakan masukkan API key kamu:\n\`/setapikey [API_KEY_KAMU]\``);
+        return ctx.replyWithMarkdown(`⚠️ Kamu belum memasukkan API Key untuk Motion Control.\nSilakan gunakan menu *Pengaturan API Key* atau perintah /apikey untuk menyimpannya.`);
     }
 
     const activeKey = keyDoc.data().key;
@@ -227,6 +259,21 @@ bot.action('model_ltx', async (ctx) => {
     const email = await getAuthEmail(ctx.from.id);
     if (!email) return;
     ctx.reply('Fitur LTX 2.0 segera hadir untuk Mbelgedez Squad! ⚡'); 
+});
+
+bot.action('menu_apikey', async (ctx) => {
+    ctx.answerCbQuery();
+    const userId = ctx.from.id;
+    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+    let status = keyDoc.exists ? "✅ Tersimpan" : "❌ Belum ada";
+
+    ctx.replyWithMarkdown(
+        `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
+        Markup.inlineKeyboard([
+            [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
+            [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
+        ])
+    );
 });
 
 bot.action('main_menu', (ctx) => { 
