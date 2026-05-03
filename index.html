@@ -261,7 +261,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Variabel untuk menyimpan API Key dari input user
         window.currentApiKey = "";
 
         // UI Functions
@@ -279,7 +278,7 @@
             msgBox.classList.remove('flex');
         };
 
-        // --- SISTEM LOGIN (TETAP PAKAI FIRESTORE AGAR AMAN) ---
+        // --- SISTEM LOGIN ---
         window.verifyAccess = async function() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const btn = document.getElementById('verifyBtn');
@@ -297,15 +296,12 @@
                 const docSnap = await getDoc(userRef);
 
                 if (docSnap.exists()) {
-                    try {
-                        await updateDoc(userRef, { lastActive: new Date().toLocaleString('id-ID') });
-                    } catch (e) { console.error("Gagal update lastActive", e); }
+                    try { await updateDoc(userRef, { lastActive: new Date().toLocaleString('id-ID') }); } catch (e) {}
 
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
                     document.getElementById('activeUserEmail').innerText = email;
                     
-                    // Muat API Key dari Local Storage jika sudah ada
                     const savedKey = localStorage.getItem('magnificApiKey');
                     if(savedKey) {
                         document.getElementById('appApiKey').value = savedKey;
@@ -318,13 +314,11 @@
                         document.getElementById('apiKeyStatus').innerText = "Status: Belum tersimpan";
                         document.getElementById('apiKeyStatus').className = "text-xs text-red-400 mt-2";
                     }
-                    
                     window.showMessage("Akses Diberikan!", "Selamat datang di Ailabs Motion Control. Sistem siap digunakan.");
                 } else {
                     window.showMessage("Akses Ditolak!", "Email belum terdaftar di sistem Ailabs. Hubungi Admin Bangpro.");
                 }
             } catch (error) {
-                console.error("Error connecting to Firebase:", error);
                 window.showMessage("Kesalahan Sistem", "Gagal menghubungi database Ailabs.");
             } finally {
                 btn.innerText = "Buka Akses";
@@ -455,16 +449,16 @@
             try { result = await response.json(); } 
             catch (e) { throw new Error("Endpoint backend /api/upload tidak ditemukan atau error."); }
 
-            if (!response.ok || (!result.success && !result.data && !result.url)) {
+            if (!response.ok || (!result.success && !result.url)) {
                 throw new Error(result.msg || result.error || "Gagal upload ke backend.");
             }
             
-            const directUrl = result.data?.downloadUrl || result.data?.fileUrl || result.url || result.data;
+            const directUrl = result.url;
             if (!directUrl || !directUrl.startsWith('http')) throw new Error("Format URL invalid dari server API.");
             return directUrl;
         }
 
-        // --- SISTEM GENERATE MOTION CONTROL DENGAN MAGNIFIC API ---
+        // --- SISTEM GENERATE MOTION CONTROL DENGAN PROXY MAGNIFIC API ---
         window.startGeneration = async function() {
             const photoInput = document.getElementById('photoInput');
             const videoInput = document.getElementById('videoInput');
@@ -484,7 +478,6 @@
                 return;
             }
 
-            // Otomatis simpan API Key jika belum disave saat klik generate
             if(appApiKeyInput !== window.currentApiKey) {
                 window.currentApiKey = appApiKeyInput;
                 localStorage.setItem('magnificApiKey', appApiKeyInput);
@@ -507,7 +500,7 @@
                 const resizedImageB64 = await resizeImage(photoFile, 1024, 1024);
                 const photoPublicUrl = await uploadViaBackend(resizedImageB64, 'motion-images', `img_${Date.now()}.jpg`);
 
-                loadingText.innerText = "Kompresi & Mengunggah Video (Menghindari Limit Server)...";
+                loadingText.innerText = "Kompresi & Mengunggah Video...";
                 let finalVideoFile = videoFile;
                 if (videoFile.size > 3.5 * 1024 * 1024) {
                     finalVideoFile = await window.compressVideoClientSide(videoFile);
@@ -516,25 +509,24 @@
                 const videoB64 = await new Promise((res) => { const r = new FileReader(); r.onload = ()=>res(r.result); r.readAsDataURL(finalVideoFile); });
                 const videoPublicUrl = await uploadViaBackend(videoB64, 'motion-videos', `vid_${Date.now()}.${finalVideoFile.type === 'video/webm' ? 'webm' : 'mp4'}`);
 
-                // 2. TEMBAK MAGNIFIC API (START TASK DENGAN MODEL DINAMIS)
+                // 2. TEMBAK MAGNIFIC API MELALUI JEMBATAN PROXY (/api/proxy)
                 const modelName = modelSelect === 'pro' ? 'Kling 3 Pro' : 'Kling 3 Standard';
                 loadingText.innerText = `Meminta AI Magnific merender menggunakan ${modelName} (Mode Face Lock Ketat)...`;
                 
-                // Base URL menyesuaikan dengan model yang dipilih
                 const apiBaseUrl = modelSelect === 'pro' 
                     ? 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-pro' 
                     : 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std';
 
-                // Menerapkan instruksi Face Lock dari Bangpro secara otomatis di prompt
                 const strictPrompt = "highly detailed, photorealistic, strict face lock, perfectly preserve facial features and identity of the reference image, seamless motion transfer";
 
-                const startResponse = await fetch(apiBaseUrl, {
+                const startResponse = await fetch('/api/proxy', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'x-magnific-api-key': window.currentApiKey
                     },
                     body: JSON.stringify({
+                        url: apiBaseUrl, // Minta proxy menembakkan payload ini ke URL Magnific
                         image_url: photoPublicUrl,
                         video_url: videoPublicUrl,
                         prompt: strictPrompt,
@@ -544,70 +536,70 @@
                 });
 
                 if (!startResponse.ok) {
-                    const errObj = await startResponse.json();
-                    throw new Error(errObj.message || `Gagal memulai tugas di server Magnific (${modelName}).`);
+                    let errObj = {};
+                    try { errObj = await startResponse.json(); } catch(e){}
+                    throw new Error(errObj.message || errObj.error || `Gagal memulai tugas di server Magnific (${modelName}).`);
                 }
 
                 const startData = await startResponse.json();
-                
-                // Mendapatkan Task ID
                 const taskId = startData.data?.task_id || startData.task_id; 
                 if (!taskId) throw new Error("Task ID tidak didapatkan dari server.");
 
-                // 3. POLLING (MENGECEK STATUS RENDER TERUS MENERUS)
-                loadingText.innerText = `Video sedang dirender oleh ${modelName}. Mohon tunggu (bisa memakan waktu 1-3 menit)...`;
+                // 3. POLLING VIA PROXY (MENGECEK STATUS RENDER TERUS MENERUS)
+                loadingText.innerText = `Video sedang dirender oleh ${modelName}. Mohon tunggu (1-3 menit)...`;
                 
                 const checkTaskStatus = async () => {
-                    const statusResponse = await fetch(`${apiBaseUrl}/${taskId}`, {
-                        method: 'GET',
-                        headers: { 'x-magnific-api-key': window.currentApiKey }
-                    });
+                    try {
+                        const targetCheckUrl = `${apiBaseUrl}/${taskId}`;
+                        const statusResponse = await fetch(`/api/proxy?url=${encodeURIComponent(targetCheckUrl)}`, {
+                            method: 'GET',
+                            headers: { 'x-magnific-api-key': window.currentApiKey }
+                        });
 
-                    if (!statusResponse.ok) throw new Error("Gagal mengecek status tugas.");
+                        if (!statusResponse.ok) throw new Error("Gagal mengecek status tugas.");
 
-                    const statusData = await statusResponse.json();
-                    const currentStatus = statusData.data?.status || statusData.status;
+                        const statusData = await statusResponse.json();
+                        const currentStatus = statusData.data?.status || statusData.status;
 
-                    if (currentStatus === "COMPLETED") {
-                        // RENDER SUKSES
-                        const resultUrl = statusData.data?.generated?.[0] || statusData.generated?.[0];
-                        if (!resultUrl) throw new Error("URL Hasil Video tidak ditemukan dari Magnific.");
+                        if (currentStatus === "COMPLETED") {
+                            const resultUrl = statusData.data?.generated?.[0] || statusData.generated?.[0];
+                            if (!resultUrl) throw new Error("URL Hasil Video tidak ditemukan dari Magnific.");
 
-                        loadingOverlay.classList.add('hidden');
-                        loadingOverlay.classList.remove('flex');
+                            loadingOverlay.classList.add('hidden');
+                            loadingOverlay.classList.remove('flex');
 
-                        // Tambah Poin Render di Database Admin
-                        try {
-                            const activeEmail = document.getElementById('activeUserEmail').innerText;
-                            const userRef = doc(db, "authorizedUsers", activeEmail);
-                            await updateDoc(userRef, { usageCount: increment(1) });
-                        } catch (e) { console.error("Gagal update aktivitas", e); }
+                            try {
+                                const activeEmail = document.getElementById('activeUserEmail').innerText;
+                                const userRef = doc(db, "authorizedUsers", activeEmail);
+                                await updateDoc(userRef, { usageCount: increment(1) });
+                            } catch (e) { console.error("Gagal update aktivitas", e); }
 
-                        // Tampilkan Hasil
-                        const resultContainer = document.getElementById('resultContainer');
-                        const resultVideo = document.getElementById('resultVideo');
-                        const downloadBtn = document.getElementById('downloadBtn');
-                        
-                        resultVideo.src = resultUrl;
-                        downloadBtn.href = resultUrl;
-                        
-                        resultContainer.classList.remove('hidden');
-                        resultContainer.classList.add('flex');
-                        resultContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                            const resultContainer = document.getElementById('resultContainer');
+                            const resultVideo = document.getElementById('resultVideo');
+                            const downloadBtn = document.getElementById('downloadBtn');
+                            
+                            resultVideo.src = resultUrl;
+                            downloadBtn.href = resultUrl;
+                            
+                            resultContainer.classList.remove('hidden');
+                            resultContainer.classList.add('flex');
+                            resultContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
-                        window.showMessage("Berhasil!", "Video Motion Control telah selesai dengan perlindungan wajah yang ketat!");
+                            window.showMessage("Berhasil!", "Video Motion Control telah selesai dengan perlindungan wajah yang ketat!");
 
-                    } else if (currentStatus === "FAILED") {
-                        loadingOverlay.classList.add('hidden');
-                        loadingOverlay.classList.remove('flex');
-                        window.showMessage("Render Gagal", "Server AI Magnific menolak atau gagal memproses video.");
-                    } else {
-                        // MASIH PROSES (CREATED / IN_PROGRESS) -> Ulangi cek 5 detik lagi
-                        setTimeout(checkTaskStatus, 5000);
+                        } else if (currentStatus === "FAILED") {
+                            loadingOverlay.classList.add('hidden');
+                            loadingOverlay.classList.remove('flex');
+                            window.showMessage("Render Gagal", "Server AI Magnific menolak atau gagal memproses video.");
+                        } else {
+                            setTimeout(checkTaskStatus, 5000);
+                        }
+                    } catch(e) {
+                        console.error("Polling error", e);
+                        setTimeout(checkTaskStatus, 5000); // Lanjutkan cek jika jaringan ngedrop
                     }
                 };
 
-                // Mulai pengecekan pertama setelah 5 detik
                 setTimeout(checkTaskStatus, 5000);
 
             } catch (error) {
