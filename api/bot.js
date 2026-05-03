@@ -180,7 +180,18 @@ bot.command('setkey', async (ctx) => {
         return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
     } catch (error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nAPI Key tidak valid. Silakan periksa kembali API Key Magnific kamu.`);
+        
+        if (error.response && error.response.status === 401) {
+            // Jika status 401 Unauthorized, berarti key murni salah
+            return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nServer Magnific menjawab: **Unauthorized**. Key ini salah atau belum terdaftar. Silakan periksa kembali.`);
+        } else if (error.response) {
+            // Jika status selain 401 (misal 403 Forbidden), key benar tapi ada limitasi akun. Tetap kita simpan.
+            const errMsg = error.response.data?.message || `Error ${error.response.status}`;
+            await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
+            return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Dengan Catatan)*\n\nKey kamu tersimpan dan formatnya dikenali. Namun saat dites, server Magnific memberikan pesan: _"${errMsg}"_.\n\nHal ini biasanya terjadi jika akun kamu baru atau belum memiliki akses ke Kling 3. Kamu tetap bisa mencobanya di menu \`/video\`.`);
+        } else {
+            return ctx.replyWithMarkdown(`❌ *Koneksi Gagal*\n\nTidak bisa menghubungi server Magnific saat ini. Coba lagi nanti.`);
+        }
     }
 });
 
@@ -207,7 +218,18 @@ bot.on('text', async (ctx, next) => {
             return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
         } catch (error) {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nAPI Key tidak valid. Silakan periksa kembali API Key Magnific kamu.`);
+            
+            if (error.response && error.response.status === 401) {
+                // Jika status 401 Unauthorized, berarti key murni salah
+                return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nServer Magnific menjawab: **Unauthorized**. Key ini salah atau belum terdaftar. Silakan periksa kembali.`);
+            } else if (error.response) {
+                // Jika status selain 401 (misal 403 Forbidden), key benar tapi ada limitasi akun. Tetap kita simpan.
+                const errMsg = error.response.data?.message || `Error ${error.response.status}`;
+                await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
+                return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Dengan Catatan)*\n\nKey kamu tersimpan dan formatnya dikenali. Namun saat dites, server Magnific memberikan pesan: _"${errMsg}"_.\n\nHal ini biasanya terjadi jika akun kamu baru atau belum memiliki akses ke Kling 3. Kamu tetap bisa mencobanya di menu \`/video\`.`);
+            } else {
+                return ctx.replyWithMarkdown(`❌ *Koneksi Gagal*\n\nTidak bisa menghubungi server Magnific saat ini. Coba lagi nanti.`);
+            }
         }
     }
     return next();
