@@ -84,8 +84,8 @@
             </div>
         </div>
         <div class="glass-panel px-6 py-2 flex items-center gap-3">
-            <div class="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse"></div>
-            <span class="text-sm font-semibold text-green-400">Sistem Online</span>
+            <div id="statusDot" class="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_10px_#eab308] animate-pulse"></div>
+            <span id="statusText" class="text-sm font-semibold text-yellow-400">Menghubungkan...</span>
         </div>
     </div>
 
@@ -109,12 +109,12 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
                     Daftarkan Akses Baru
                 </h3>
-                <form id="addUserForm" onsubmit="handleAddUser(event)">
+                <form id="addUserForm">
                     <div class="mb-4">
                         <label class="block text-xs text-gray-400 mb-2">Alamat Gmail User</label>
                         <input type="email" id="newUserEmail" required placeholder="contoh@gmail.com" class="glass-input w-full px-4 py-3 rounded-lg text-sm">
                     </div>
-                    <button type="submit" class="btn-glow-blue w-full py-3 rounded-lg text-sm font-bold text-white flex justify-center items-center gap-2">
+                    <button type="submit" id="addBtn" class="btn-glow-blue w-full py-3 rounded-lg text-sm font-bold text-white flex justify-center items-center gap-2">
                         Berikan Akses
                     </button>
                 </form>
@@ -143,7 +143,7 @@
                         </tr>
                     </thead>
                     <tbody id="userTableBody">
-                        <!-- Data User Akan Dirender Di Sini -->
+                        <tr><td colspan="4" class="text-center py-8 text-gray-500">Memuat data dari database...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -161,134 +161,215 @@
         </div>
     </div>
 
-    <script>
-        // Simulasi Database (In-Memory State)
-        // Nanti array ini akan diganti dengan tarikan data dari database sungguhan (seperti Firebase/Firestore)
-        let authorizedUsers = [
-            { id: 1714500000000, email: 'bangpro.vip@gmail.com', date: '01 Mei 2026' },
-            { id: 1714586400000, email: 'client.mbelgedez@gmail.com', date: '02 Mei 2026' }
-        ];
+    <!-- FIREBASE SDK & LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Format tanggal hari ini
-        function getTodayDate() {
-            const today = new Date();
-            const options = { day: '2-digit', month: 'short', year: 'numeric' };
-            return today.toLocaleDateString('id-ID', options);
-        }
+        // =====================================================================
+        // PENTING BROW: GANTI BAGIAN INI DENGAN CONFIG FIREBASE KAMU SENDIRI!
+        // Ambil di Dashboard Firebase -> Project Settings -> General -> Your Apps (Web)
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "ISI_API_KEY_DISINI", 
+            authDomain: "ailabs-new-1.firebaseapp.com",
+            projectId: "ailabs-new-1",
+            storageBucket: "ailabs-new-1.appspot.com",
+            messagingSenderId: "ISI_MESSAGING_SENDER_ID",
+            appId: "ISI_APP_ID"
+        };
 
-        // Render Tabel User
-        function renderTable(usersToRender = authorizedUsers) {
-            const tbody = document.getElementById('userTableBody');
-            document.getElementById('totalUsersCount').innerText = authorizedUsers.length;
-            tbody.innerHTML = '';
-
-            if (usersToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
-                return;
-            }
-
-            usersToRender.forEach(user => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="py-3 px-4 font-medium text-gray-200">${user.email}</td>
-                    <td class="py-3 px-4 text-gray-400 text-xs">${user.date}</td>
-                    <td class="py-3 px-4 text-center">
-                        <span class="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-[10px] font-bold tracking-wider">AKTIF</span>
-                    </td>
-                    <td class="py-3 px-4 text-right">
-                        <button onclick="confirmDelete(${user.id}, '${user.email}')" class="btn-glow-red px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 inline-flex">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            Hapus
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Fungsi Tambah User
-        function handleAddUser(event) {
-            event.preventDefault();
-            const emailInput = document.getElementById('newUserEmail');
-            const email = emailInput.value.trim().toLowerCase();
-
-            // Validasi jika email sudah ada
-            const isExist = authorizedUsers.find(u => u.email === email);
-            if (isExist) {
-                showMessage("Peringatan", `Email ${email} sudah terdaftar di sistem!`);
-                return;
-            }
-
-            // Tambahkan ke array
-            const newUser = {
-                id: Date.now(),
-                email: email,
-                date: getTodayDate()
-            };
-            
-            authorizedUsers.unshift(newUser); // Taruh di paling atas
-            emailInput.value = ''; // Kosongkan input
-            
-            renderTable();
-            showMessage("Sukses!", `Akses untuk ${email} berhasil ditambahkan.`);
-        }
-
-        // Fungsi Filter/Search
-        function filterUsers() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = authorizedUsers.filter(u => u.email.includes(query));
-            renderTable(filtered);
-        }
-
-        // Variabel penampung id untuk hapus
-        let userToDeleteId = null;
-
-        // Tampilkan konfirmasi hapus
-        function confirmDelete(id, email) {
-            userToDeleteId = id;
-            document.getElementById('messageTitle').innerText = "Cabut Akses?";
-            document.getElementById('messageText').innerText = `Yakin ingin menghapus akses untuk ${email}? Mereka tidak akan bisa masuk ke aplikasi lagi.`;
-            
-            const btnContainer = document.getElementById('messageButtons');
-            btnContainer.innerHTML = `
-                <button onclick="closeMessage()" class="px-6 py-2 rounded-xl text-sm font-bold text-gray-300 border border-gray-600 hover:bg-gray-800 transition-all w-full">Batal</button>
-                <button onclick="executeDelete()" class="btn-glow-red px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Ya, Hapus</button>
-            `;
-            
+        // Fungsi menampilkan pesan custom
+        window.showMessage = function(title, text) {
+            document.getElementById('messageTitle').innerText = title;
+            document.getElementById('messageText').innerText = text;
             const msgBox = document.getElementById('messageBox');
             msgBox.classList.remove('hidden');
             msgBox.classList.add('flex');
-        }
+        };
 
-        // Eksekusi hapus setelah konfirmasi
-        function executeDelete() {
-            authorizedUsers = authorizedUsers.filter(u => u.id !== userToDeleteId);
-            userToDeleteId = null;
-            renderTable();
-            
-            // Kembalikan tombol message box ke mode biasa
-            document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
-            
-            document.getElementById('messageTitle').innerText = "Terhapus";
-            document.getElementById('messageText').innerText = "Akses user berhasil dicabut dari sistem.";
-        }
-
-        // Fungsi menutup popup
-        function closeMessage() {
+        window.closeMessage = function() {
             const msgBox = document.getElementById('messageBox');
             msgBox.classList.add('hidden');
             msgBox.classList.remove('flex');
-            
-            // Reset tombol ke default just in case
             setTimeout(() => {
                 document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
             }, 300);
-        }
-
-        // Initial Render
-        window.onload = () => {
-            renderTable();
         };
+
+        // Pengecekan Config
+        if (firebaseConfig.apiKey === "ISI_API_KEY_DISINI") {
+            document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
+            document.getElementById('statusText').innerText = "Config Kosong!";
+            document.getElementById('statusText').className = "text-sm font-semibold text-red-400";
+            showMessage("Konfigurasi Firebase Kosong", "Pastikan kamu sudah mengganti bagian 'ISI_API_KEY_DISINI' dengan konfigurasi Firebase milikmu di dalam kode HTML.");
+        } else {
+            // Inisialisasi Firebase App, Auth, dan Firestore
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const usersCollection = collection(db, "authorizedUsers");
+
+            let currentUsers = [];
+            let userToDeleteEmail = null;
+
+            function getTodayDate() {
+                const today = new Date();
+                return today.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+
+            // Render Table
+            window.renderTable = function(usersToRender = currentUsers) {
+                const tbody = document.getElementById('userTableBody');
+                document.getElementById('totalUsersCount').innerText = currentUsers.length;
+                tbody.innerHTML = '';
+
+                if (usersToRender.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
+                    return;
+                }
+
+                usersToRender.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-medium text-gray-200">${user.email}</td>
+                        <td class="py-3 px-4 text-gray-400 text-xs">${user.date}</td>
+                        <td class="py-3 px-4 text-center">
+                            <span class="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-[10px] font-bold tracking-wider">AKTIF</span>
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <button onclick="confirmDelete('${user.email}')" class="btn-glow-red px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 inline-flex">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                Hapus
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            };
+
+            window.filterUsers = function() {
+                const query = document.getElementById('searchInput').value.toLowerCase();
+                const filtered = currentUsers.filter(u => u.email.includes(query));
+                window.renderTable(filtered);
+            };
+
+            window.confirmDelete = function(email) {
+                userToDeleteEmail = email;
+                document.getElementById('messageTitle').innerText = "Cabut Akses?";
+                document.getElementById('messageText').innerText = `Yakin ingin menghapus akses untuk ${email}? Mereka tidak akan bisa masuk ke aplikasi bot lagi.`;
+                
+                const btnContainer = document.getElementById('messageButtons');
+                btnContainer.innerHTML = `
+                    <button onclick="closeMessage()" class="px-6 py-2 rounded-xl text-sm font-bold text-gray-300 border border-gray-600 hover:bg-gray-800 transition-all w-full">Batal</button>
+                    <button onclick="executeDelete()" id="btnYaHapus" class="btn-glow-red px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Ya, Hapus</button>
+                `;
+                
+                const msgBox = document.getElementById('messageBox');
+                msgBox.classList.remove('hidden');
+                msgBox.classList.add('flex');
+            };
+
+            window.executeDelete = async function() {
+                if (!userToDeleteEmail) return;
+                
+                const btnYa = document.getElementById('btnYaHapus');
+                if (btnYa) {
+                    btnYa.innerText = "Sedang Menghapus...";
+                    btnYa.disabled = true;
+                    btnYa.classList.add('opacity-50', 'cursor-wait');
+                }
+
+                try {
+                    await deleteDoc(doc(db, "authorizedUsers", userToDeleteEmail));
+                    
+                    document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
+                    document.getElementById('messageTitle').innerText = "Berhasil Dihapus!";
+                    document.getElementById('messageText').innerText = `Akses untuk ${userToDeleteEmail} berhasil dicabut dari sistem.`;
+                    userToDeleteEmail = null;
+                } catch (error) {
+                    console.error("Error saat menghapus: ", error);
+                    document.getElementById('messageTitle').innerText = "Gagal Menghapus";
+                    document.getElementById('messageText').innerText = "Terjadi kesalahan: " + error.message;
+                    document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
+                }
+            };
+
+            // --- PROSES AUTENTIKASI ANONIM & REALTIME LISTENER ---
+            // Autentikasi diperlukan agar Firebase tidak menolak akses meskipun rules sudah publik
+            signInAnonymously(auth).then(() => {
+                onSnapshot(usersCollection, (snapshot) => {
+                    currentUsers = [];
+                    snapshot.forEach((docSnap) => {
+                        currentUsers.push({
+                            email: docSnap.data().email,
+                            date: docSnap.data().dateAdded || '-',
+                            timestamp: docSnap.data().timestamp || 0
+                        });
+                    });
+
+                    currentUsers.sort((a, b) => b.timestamp - a.timestamp);
+                    window.renderTable();
+
+                    document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse";
+                    document.getElementById('statusText').innerText = "Sistem Online";
+                    document.getElementById('statusText').className = "text-sm font-semibold text-green-400";
+                }, (error) => {
+                    console.error(error);
+                    document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
+                    
+                    if (error.code === 'permission-denied') {
+                        document.getElementById('statusText').innerText = "Izin Ditolak";
+                        showMessage("Izin Firebase Terkunci", "Aturan (Rules) Firebase belum sepenuhnya diperbarui. Biasanya butuh 1-2 menit setelah kamu klik Publish di console. Coba refresh halaman ini sebentar lagi.");
+                    } else {
+                        document.getElementById('statusText').innerText = "Koneksi Terputus";
+                    }
+                    document.getElementById('statusText').className = "text-sm font-semibold text-red-400";
+                });
+            }).catch((error) => {
+                console.error("Auth Error:", error);
+                document.getElementById('statusText').innerText = "Gagal Autentikasi";
+                document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
+            });
+
+            // --- TAMBAH DATA KE FIRESTORE ---
+            document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const emailInput = document.getElementById('newUserEmail');
+                const btn = document.getElementById('addBtn');
+                const email = emailInput.value.trim().toLowerCase();
+
+                if (currentUsers.find(u => u.email === email)) {
+                    showMessage("Peringatan", `Email ${email} sudah terdaftar di sistem!`);
+                    return;
+                }
+
+                btn.innerText = "Menyimpan...";
+                btn.disabled = true;
+
+                try {
+                    await setDoc(doc(db, "authorizedUsers", email), {
+                        email: email,
+                        dateAdded: getTodayDate(),
+                        timestamp: Date.now()
+                    });
+                    
+                    emailInput.value = '';
+                    showMessage("Sukses!", `Akses untuk ${email} berhasil ditambahkan ke database.`);
+                } catch (error) {
+                    console.error(error);
+                    if (error.code === 'permission-denied') {
+                        showMessage("Akses Ditolak", "Firebase menolak permintaan karena aturan keamanan. Tunggu 1-2 menit agar Rules Firebase aktif.");
+                    } else {
+                        showMessage("Error", "Gagal menyimpan: " + error.message);
+                    }
+                } finally {
+                    btn.innerText = "Berikan Akses";
+                    btn.disabled = false;
+                }
+            });
+        }
     </script>
 </body>
 </html>
