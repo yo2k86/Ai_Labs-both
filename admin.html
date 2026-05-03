@@ -79,7 +79,7 @@
             <img src="https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png" alt="Logo" class="w-12 md:w-16 drop-shadow-[0_0_10px_rgba(0,150,255,0.6)]">
             <div>
                 <h1 class="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">Admin Control Panel</h1>
-                <p class="text-xs md:text-sm text-blue-300/70">Ailabs gen pro - Access Management</p>
+                <p class="text-xs md:text-sm text-blue-300/70">Ailabs gen pro - Access & Activity Monitor</p>
             </div>
         </div>
         <div class="glass-panel px-6 py-2 flex items-center gap-3">
@@ -88,7 +88,8 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Layout Grid diubah jadi 4 kolom agar tabel lebih luas -->
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         <div class="space-y-6 lg:col-span-1">
             <div class="glass-panel p-6 flex items-center justify-between">
@@ -116,9 +117,10 @@
             </div>
         </div>
 
-        <div class="glass-panel p-6 lg:col-span-2 flex flex-col h-[500px]">
+        <!-- Tabel diperlebar mengambil 3 kolom -->
+        <div class="glass-panel p-6 lg:col-span-3 flex flex-col h-[500px]">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-blue-300">Daftar Gmail Terdaftar</h3>
+                <h3 class="text-lg font-semibold text-blue-300">Aktivitas & Daftar Pengguna</h3>
                 <div class="relative">
                     <input type="text" id="searchInput" onkeyup="filterUsers()" placeholder="Cari Gmail..." class="glass-input pl-9 pr-4 py-2 rounded-full text-xs w-48 md:w-64">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -129,14 +131,15 @@
                 <table class="w-full text-left border-collapse glass-table text-sm">
                     <thead>
                         <tr>
-                            <th class="py-3 px-4 rounded-tl-lg font-medium text-blue-300">Email (Akun Google)</th>
-                            <th class="py-3 px-4 font-medium text-blue-300">Tanggal Daftar</th>
+                            <th class="py-3 px-4 rounded-tl-lg font-medium text-blue-300">Email User</th>
+                            <th class="py-3 px-4 font-medium text-blue-300">Terakhir Aktif</th>
+                            <th class="py-3 px-4 font-medium text-blue-300 text-center">Total Render</th>
                             <th class="py-3 px-4 font-medium text-blue-300 text-center">Status</th>
                             <th class="py-3 px-4 rounded-tr-lg font-medium text-blue-300 text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="userTableBody">
-                        <tr><td colspan="4" class="text-center py-8 text-gray-500">Memuat data dari database...</td></tr>
+                        <tr><td colspan="5" class="text-center py-8 text-gray-500">Memuat data dari database...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -153,6 +156,7 @@
         </div>
     </div>
 
+    <!-- FIREBASE SDK & LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -186,15 +190,22 @@
             tbody.innerHTML = '';
 
             if (usersToRender.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
                 return;
             }
 
             usersToRender.forEach(user => {
+                // Warning jika pemakaian berlebihan (Misal > 10 kali)
+                const isWarning = user.usageCount >= 10;
+                const usageWarningClass = isWarning ? "text-red-400 bg-red-500/20 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.3)]" : "text-blue-400 bg-blue-500/20 border-blue-500/30";
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-medium text-gray-200">${user.email}</td>
-                    <td class="py-3 px-4 text-gray-400 text-xs">${user.date}</td>
+                    <td class="py-3 px-4 text-gray-400 text-xs">${user.lastActive}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-3 py-1 rounded-md text-xs font-bold border ${usageWarningClass}">${user.usageCount}x Render</span>
+                    </td>
                     <td class="py-3 px-4 text-center">
                         <span class="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-[10px] font-bold tracking-wider">AKTIF</span>
                     </td>
@@ -276,10 +287,14 @@
         onSnapshot(usersCollection, (snapshot) => {
             currentUsers = [];
             snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
                 currentUsers.push({
-                    email: docSnap.data().email,
-                    date: docSnap.data().dateAdded || '-',
-                    timestamp: docSnap.data().timestamp || 0
+                    email: data.email,
+                    date: data.dateAdded || '-',
+                    timestamp: data.timestamp || 0,
+                    // Penambahan fitur pelacakan di sini:
+                    lastActive: data.lastActive || 'Belum pernah login',
+                    usageCount: data.usageCount || 0
                 });
             });
 
@@ -312,10 +327,13 @@
             btn.disabled = true;
 
             try {
+                // Menyimpan data email dengan nilai default aktivitas 0
                 await setDoc(doc(db, "authorizedUsers", email), {
                     email: email,
                     dateAdded: getTodayDate(),
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    lastActive: 'Belum pernah login',
+                    usageCount: 0
                 });
                 
                 emailInput.value = '';
