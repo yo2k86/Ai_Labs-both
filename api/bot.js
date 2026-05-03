@@ -278,19 +278,34 @@ bot.on('photo', async (ctx, next) => {
     return next();
 });
 
-// 3. Tangkap VIDEO -> Eksekusi ke Magnific & Kirim Tombol Lacak
-bot.on('video', async (ctx, next) => {
+// 3. Tangkap VIDEO, ANIMASI, ATAU DOKUMEN -> Eksekusi ke Magnific
+bot.on(['video', 'animation', 'document'], async (ctx, next) => {
     const userId = ctx.from.id;
     const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
     if (stateDoc.exists && stateDoc.data().step === 'WAITING_VIDEO') {
-        const video = ctx.message.video;
-        if (video.file_size > 20000000) return ctx.reply('⚠️ Ukuran video > 20MB. Kompres dulu brow.');
+        
+        let media = ctx.message.video || ctx.message.animation;
+        
+        if (!media && ctx.message.document) {
+            const doc = ctx.message.document;
+            if (doc.mime_type && doc.mime_type.startsWith('video/')) {
+                media = doc;
+            } else {
+                return ctx.reply('⚠️ File dokumen yang kamu kirim bukan format video brow.');
+            }
+        }
 
-        const loadingMsg = await ctx.reply('⏳ Mengirim instruksi ke server Magnific...');
+        if (!media) return next();
+
+        if (media.file_size > 20000000) {
+            return ctx.reply('⚠️ Ukuran video terlalu besar (> 20MB). Telegram membatasi bot, tolong kompres dulu ya brow.');
+        }
+
+        const loadingMsg = await ctx.reply('⏳ Membaca video & mengirim instruksi ke server Magnific...');
         
         try {
-            const file = await ctx.telegram.getFile(video.file_id);
+            const file = await ctx.telegram.getFile(media.file_id);
             const videoUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
             const imageUrl = stateDoc.data().tempImageUrl;
 
@@ -305,10 +320,10 @@ bot.on('video', async (ctx, next) => {
             );
 
             const taskId = response.data?.task_id || response.data?.data?.task_id; 
+            
             await db.collection('userStates').doc(userId.toString()).delete(); // Clear state
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
 
-            // Kirim pesan dengan tombol LACAK TASK persis seperti bot temanmu
             return ctx.replyWithMarkdown(
                 `✅ *Tugas Berhasil Dikirim!*\n\n` +
                 `Task ID: \`${taskId}\`\nStatus AI: _in_progress_\n\n` +
@@ -356,14 +371,12 @@ bot.action(/^track_(.+)$/, async (ctx) => {
             const videoUrl = taskData.generated[0]; //[cite: 2]
             
             try {
-                // Mencoba mengirim video langsung ke chat
                 await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, parse_mode: 'Markdown' });
             } catch (videoError) {
-                // JIKA GAGAL (karena file kebesaran > 50MB, mirip screenshot temanmu)
                 ctx.replyWithMarkdown(
                     `⚠️ *File terlalu besar untuk dikirim langsung via Telegram.*\n\n` +
                     `🔗 *Link Permanen (Download Langsung):*\n${videoUrl}\n\n` +
-                    `Silakan klik link di atas untuk mengunduh videonya brow!`,
+                    `Silakan klik tombol di bawah ini untuk mengunduh videonya brow!`,
                     Markup.inlineKeyboard([[Markup.button.url('📥 Download Video', videoUrl)]])
                 );
             }
