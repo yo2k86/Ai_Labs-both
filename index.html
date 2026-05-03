@@ -124,10 +124,7 @@
                     <label class="block text-xs text-gray-400 mb-1">Email Terdaftar</label>
                     <input type="email" id="loginEmail" placeholder="contoh@gmail.com" class="glass-input w-full px-4 py-3 rounded-lg text-sm md:text-base">
                 </div>
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">API Key</label>
-                    <input type="text" id="loginApiKey" placeholder="Masukkan API Key..." class="glass-input w-full px-4 py-3 rounded-lg text-sm md:text-base">
-                </div>
+                <!-- API Key Input sudah dihapus dari UI -->
                 <button id="verifyBtn" onclick="verifyAccess()" class="btn-glow w-full py-3 rounded-lg text-sm md:text-base font-bold text-white mt-2">
                     Buka Akses
                 </button>
@@ -240,6 +237,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // ==========================================
+        // PENTING: TARUH API KEY MOTION CONTROL KAMU DI SINI
+        // Nanti bisa digonta-ganti kalau dapet akun gratisan baru
+        // ==========================================
+        const MOTION_API_KEY = "MASUKAN_API_KEY_KAMU_DISINI";
+
         // UI Functions
         window.showMessage = function(title, text) {
             document.getElementById('messageTitle').innerText = title;
@@ -258,11 +261,10 @@
         // --- SISTEM LOGIN (MEMBACA DARI DATABASE ADMIN) ---
         window.verifyAccess = async function() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-            const apiKey = document.getElementById('loginApiKey').value.trim();
             const btn = document.getElementById('verifyBtn');
 
-            if (!email || !apiKey) {
-                window.showMessage("Peringatan", "Harap masukkan Email dan API Key Anda terlebih dahulu!");
+            if (!email) {
+                window.showMessage("Peringatan", "Harap masukkan Email Anda terlebih dahulu!");
                 return;
             }
 
@@ -306,9 +308,6 @@
             document.getElementById('resultContainer').classList.add('hidden');
             document.getElementById('resultContainer').classList.remove('flex');
 
-            // Reset login form
-            document.getElementById('loginApiKey').value = "";
-            
             // Switch screen
             document.getElementById('appSection').classList.add('hidden');
             document.getElementById('authSection').classList.remove('hidden');
@@ -358,6 +357,9 @@
             const loadingOverlay = document.getElementById('loadingOverlay');
             loadingOverlay.classList.remove('hidden');
             loadingOverlay.classList.add('flex');
+
+            // Di sini nantinya API Key `MOTION_API_KEY` akan dikirim ke server saat melakukan request
+            console.log("Menggunakan API Key:", MOTION_API_KEY);
 
             // Simulasi proses render menggunakan API Key
             setTimeout(() => {
