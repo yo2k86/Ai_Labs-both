@@ -47,7 +47,6 @@ bot.command('login', async (ctx) => {
 
     if (!email) return ctx.replyWithMarkdown(`Masukkan email kamu, brow!\n*Contoh:*\n\`/login emailkamu@gmail.com\``);
 
-    // [LOADING] Mengaktifkan status "sedang mengetik..."
     await ctx.sendChatAction('typing');
     const loadingMsg = await ctx.reply('⏳ Sedang memverifikasi akses ke database Ailabs...');
 
@@ -209,7 +208,6 @@ bot.command('image', async (ctx) => {
     const userPrompt = ctx.message.text.replace('/image ', '');
     if (!userPrompt || userPrompt === '/image') return ctx.reply('Masukkan prompt! Contoh: /image cyberpunk city');
 
-    // [LOADING] Status upload foto
     await ctx.sendChatAction('upload_photo');
     const loadingMsg = await ctx.reply(`⏳ Merender gambar...`);
     try {
@@ -264,7 +262,6 @@ bot.on('photo', async (ctx, next) => {
     const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
     if (stateDoc.exists && stateDoc.data().step === 'WAITING_PHOTO') {
-        // [LOADING] Status mengetik
         await ctx.sendChatAction('typing');
         const loadingMsg = await ctx.reply('⏳ Memproses foto referensi...');
         
@@ -311,7 +308,6 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             return ctx.reply('⚠️ Ukuran video terlalu besar (> 20MB). Telegram membatasi bot, tolong kompres dulu ya brow.');
         }
 
-        // [LOADING] Status upload video di bagian atas chat
         await ctx.sendChatAction('upload_video');
         const loadingMsg = await ctx.reply('⏳ Sedang memproses dan mengupload ke Magnific...\n_Proses ini butuh waktu beberapa detik._');
         
@@ -323,11 +319,11 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
             const activeKey = keyDoc.data().key;
 
-            // POST task ke Magnific[cite: 5]
+            // Proses Request POST[cite: 5]
             const response = await axios.post(
                 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
-                { image_url: imageUrl, video_url: videoUrl },[cite: 5]
-                { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } }[cite: 5]
+                { image_url: imageUrl, video_url: videoUrl },
+                { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } }
             );
 
             const taskId = response.data?.task_id || response.data?.data?.task_id || response.data?.id; 
@@ -370,11 +366,10 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
 // 4. LOGIKA TOMBOL LACAK TASK & ERROR HANDLING VIDEO BESAR
 // ==========================================
 bot.action(/^track_(.+)$/, async (ctx) => {
-    ctx.answerCbQuery('Mengecek status di server...'); // Pop-up notifikasi kecil di tombol
+    ctx.answerCbQuery('Mengecek status di server...'); 
     const taskId = ctx.match[1];
     const userId = ctx.from.id;
 
-    // [LOADING] Status upload video di atas chat
     await ctx.sendChatAction('upload_video');
 
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
@@ -384,18 +379,18 @@ bot.action(/^track_(.+)$/, async (ctx) => {
     const loadingMsg = await ctx.reply('⏳ Menarik data dari server...');
 
     try {
-        // GET status task dari Magnific[cite: 2]
+        // Cek status GET ke server Magnific[cite: 2]
         const response = await axios.get(
             `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std/${taskId}`,
-            { headers: { 'x-magnific-api-key': activeKey } }[cite: 2]
+            { headers: { 'x-magnific-api-key': activeKey } } 
         );
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         const taskData = response.data?.data;
-        const status = taskData?.status;[cite: 2]
+        const status = taskData?.status; 
 
-        if (status === 'COMPLETED') {[cite: 2]
-            const videoUrl = taskData.generated[0];[cite: 2]
+        if (status === 'COMPLETED') { 
+            const videoUrl = taskData.generated[0]; 
             
             try {
                 await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, parse_mode: 'Markdown' });
@@ -408,7 +403,7 @@ bot.action(/^track_(.+)$/, async (ctx) => {
                 );
             }
         } 
-        else if (status === 'IN_PROGRESS' || status === 'CREATED') {[cite: 2]
+        else if (status === 'IN_PROGRESS' || status === 'CREATED') { 
             ctx.replyWithMarkdown(
                 `🔄 *Status AI: ${status}*\n\n` +
                 `Video masih dirender brow. Task ID: \`${taskId}\`\n\n` +
@@ -416,7 +411,7 @@ bot.action(/^track_(.+)$/, async (ctx) => {
                 Markup.inlineKeyboard([[Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]])
             );
         } 
-        else if (status === 'FAILED') {[cite: 2]
+        else if (status === 'FAILED') { 
             ctx.reply(`❌ Pembuatan Video Gagal dari server Magnific.`);
         }
 
