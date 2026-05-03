@@ -10,7 +10,6 @@ if (!admin.apps.length) {
         credential: admin.credential.cert({
             projectId: process.env.FIREBASE_PROJECT_ID,
             clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            // Memastikan format private key terbaca dengan benar di Vercel
             privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined
         })
     });
@@ -21,7 +20,6 @@ const db = admin.firestore();
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // --- FUNGSI BANTUAN UNTUK CEK LOGIN ---
-// Mengambil data sesi dari Firestore
 async function getAuthEmail(userId) {
     try {
         const doc = await db.collection('botSessions').doc(userId.toString()).get();
@@ -32,25 +30,22 @@ async function getAuthEmail(userId) {
     }
 }
 
-// --- START COMMAND ---
+// ==========================================
+// COMMAND DASAR (START, LOGIN, LOGOUT, HELP)
+// ==========================================
 bot.start((ctx) => {
     ctx.replyWithMarkdown(
         `Halo, ${ctx.from.first_name}! 👋 Selamat datang di *Ailabs gen pro*.\n\n` +
         `⚠️ *Sistem Terkunci.*\nSebelum bisa menggunakan fitur bot, kamu harus memverifikasi aksesmu menggunakan email yang sudah didaftarkan ke Bangpro.\n\n` +
-        `Gunakan perintah ini:\n` +
-        `🔑 \`/login [email_kamu]\`\n\n` +
-        `*Contoh:*\n\`/login client.mbelgedez@gmail.com\``
+        `Gunakan perintah ini:\n🔑 \`/login [email_kamu]\``
     );
 });
 
-// --- FITUR LOGIN (TERHUBUNG FIRESTORE) ---
 bot.command('login', async (ctx) => {
     const email = ctx.message.text.replace('/login', '').trim().toLowerCase();
     const userId = ctx.from.id;
 
-    if (!email) {
-        return ctx.replyWithMarkdown(`Masukkan email kamu, brow!\n\n*Contoh:*\n\`/login emailkamu@gmail.com\``);
-    }
+    if (!email) return ctx.replyWithMarkdown(`Masukkan email kamu, brow!\n*Contoh:*\n\`/login emailkamu@gmail.com\``);
 
     const loadingMsg = await ctx.reply('⏳ Sedang memverifikasi akses ke database Ailabs...');
 
@@ -73,45 +68,39 @@ bot.command('login', async (ctx) => {
             );
         } else {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            ctx.replyWithMarkdown(
-                `⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs. Silakan hubungi Admin Bangpro untuk mendaftarkan email kamu.`
-            );
+            ctx.replyWithMarkdown(`⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs.`);
         }
     } catch (error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         ctx.reply('Ada kesalahan teknis saat menghubungi server database. Coba lagi nanti.');
-        console.error(error);
     }
 });
 
-// --- FITUR LOGOUT ---
 bot.command('logout', async (ctx) => {
     const userId = ctx.from.id;
     const email = await getAuthEmail(userId);
-    
     if (email) {
         await db.collection('botSessions').doc(userId.toString()).delete();
-        ctx.reply('🔒 Kamu telah keluar dari sistem Ailabs. Silakan /login kembali untuk menggunakan bot.');
+        ctx.reply('🔒 Kamu telah keluar dari sistem Ailabs.');
     } else {
         ctx.reply('Kamu belum login, brow.');
     }
 });
 
-// --- CUSTOM GREETINGS & BANTUAN ---
 bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
     const email = await getAuthEmail(ctx.from.id);
-    let msg = `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu, brow? 🤖\n\n`;
-    
+    let msg = `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu? 🤖\n\n`;
     if (email) {
-        msg += `Ketik /image [prompt] untuk mulai generate gambar AI,\nAtau ketik /video untuk masuk ke menu pembuatan video.`;
+        msg += `Ketik /image [prompt] untuk mulai generate gambar AI,\nAtau ketik /video untuk masuk ke menu video.`;
     } else {
         msg += `Ketik /login [email] untuk membuka akses fitur.`;
     }
-    
     ctx.replyWithMarkdown(msg);
 });
 
-// --- FITUR PENGATURAN API KEY (DENGAN TOMBOL UI) ---
+// ==========================================
+// FITUR PENGATURAN API KEY
+// ==========================================
 bot.command('apikey', async (ctx) => {
     const userId = ctx.from.id;
     const email = await getAuthEmail(userId);
@@ -132,7 +121,7 @@ bot.command('apikey', async (ctx) => {
 bot.action('action_set_apikey', async (ctx) => {
     ctx.answerCbQuery();
     ctx.replyWithMarkdown(
-        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:\n\n_(Atau jika mode reply hilang saat mem-paste, ketik saja manual format ini: /setkey API_KEY_KAMU)_',
+        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:\n_(Atau ketik manual: /setkey API_KEY_KAMU)_',
         Markup.forceReply()
     );
 });
@@ -142,13 +131,9 @@ bot.action('action_delete_apikey', async (ctx) => {
     try {
         await db.collection('apiKeys').doc(userId.toString()).delete();
         ctx.answerCbQuery('🗑️ API Key berhasil dihapus!', { show_alert: true });
-        ctx.editMessageText('🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ❌ Belum ada\n\nPilih aksi di bawah ini:', {
+        ctx.editMessageText('🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ❌ Belum ada', {
             parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '➕ Masukkan / Ganti API Key', callback_data: 'action_set_apikey' }]
-                ]
-            }
+            reply_markup: { inline_keyboard: [[{ text: '➕ Masukkan / Ganti API Key', callback_data: 'action_set_apikey' }]] }
         });
     } catch (e) {
         ctx.answerCbQuery('Gagal menghapus API Key.', { show_alert: true });
@@ -161,303 +146,245 @@ bot.command('setkey', async (ctx) => {
     if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
     const apiKey = ctx.message.text.replace('/setkey', '').trim();
-    if (!apiKey) {
-        return ctx.reply('⚠️ Format salah! Gunakan perintah seperti ini: /setkey abcdef12345');
-    }
+    if (!apiKey) return ctx.reply('⚠️ Format salah! Gunakan: /setkey abcdef12345');
 
-    const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key ke server Magnific...');
+    const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key...');
     try {
-        await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', {
-            headers: { 'x-magnific-api-key': apiKey }
-        });
-        
+        await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', { headers: { 'x-magnific-api-key': apiKey } });
         await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+        return ctx.replyWithMarkdown(`✅ *API Key Valid!* Sekarang kamu bisa menggunakan /video.`);
     } catch (error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         if (error.response && error.response.status === 401) {
-            return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nServer Magnific menjawab: **Unauthorized**. Key ini salah atau belum terdaftar. Silakan periksa kembali.`);
+            return ctx.replyWithMarkdown(`❌ *API Key Ditolak!* Unauthorized.`);
         } else if (error.response) {
-            const errMsg = error.response.data?.message || `Error ${error.response.status}`;
             await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-            return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Dengan Catatan)*\n\nKey kamu tersimpan dan formatnya dikenali. Namun saat dites, server memberikan pesan: _"${errMsg}"_.\nKamu tetap bisa mencobanya di menu \`/video\`.`);
+            return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Catatan)*\nSistem menerima limitasi akun: _"${error.response.data?.message}"_`);
         } else {
-            return ctx.replyWithMarkdown(`❌ *Koneksi Gagal*\n\nTidak bisa menghubungi server Magnific saat ini. Coba lagi nanti.`);
+            return ctx.reply(`❌ Koneksi Gagal ke Magnific.`);
         }
     }
 });
 
+// Listener untuk API Key via Reply
 bot.on('text', async (ctx, next) => {
     const isReply = ctx.message.reply_to_message && ctx.message.reply_to_message.text;
-    
-    if (isReply && ctx.message.reply_to_message.text.includes('Silakan balas (reply) pesan ini dengan API Key Magnific kamu')) {
+    if (isReply && ctx.message.reply_to_message.text.includes('balas (reply) pesan ini dengan API Key')) {
         const userId = ctx.from.id;
-        const email = await getAuthEmail(userId);
-        if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
-
         const apiKey = ctx.message.text.trim();
-        const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key ke server Magnific...');
+        const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key...');
         
         try {
-            await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', {
-                headers: { 'x-magnific-api-key': apiKey }
-            });
-            
+            await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', { headers: { 'x-magnific-api-key': apiKey } });
             await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            return ctx.replyWithMarkdown(`✅ *API Key Diterima & Valid!*\n\nKey berhasil diverifikasi! Sekarang kamu bisa menggunakan menu \`/video\` untuk Motion Control.`);
+            return ctx.replyWithMarkdown(`✅ *API Key Valid!*`);
         } catch (error) {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            if (error.response && error.response.status === 401) {
-                return ctx.replyWithMarkdown(`❌ *API Key Ditolak!*\n\nServer Magnific menjawab: **Unauthorized**.`);
-            } else if (error.response) {
-                const errMsg = error.response.data?.message || `Error ${error.response.status}`;
+            if (error.response && error.response.status === 401) return ctx.reply(`❌ *API Key Ditolak!*`);
+            if (error.response) {
                 await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-                return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Dengan Catatan)*\n\nServer merespon: _"${errMsg}"_. Kamu tetap bisa mencobanya di menu \`/video\`.`);
-            } else {
-                return ctx.replyWithMarkdown(`❌ *Koneksi Gagal*`);
+                return ctx.reply(`✅ *API Key Disimpan dengan catatan limitasi.*`);
             }
+            return ctx.reply(`❌ *Koneksi Gagal*`);
         }
     }
     return next();
 });
 
-// --- FITUR GENERATE IMAGE ---
+// ==========================================
+// FITUR IMAGE GENERATOR
+// ==========================================
 bot.command('image', async (ctx) => {
-    const userId = ctx.from.id;
-    const email = await getAuthEmail(userId);
-    if (!email) return ctx.replyWithMarkdown(`⛔ *Akses Terkunci!*\nKamu harus login dengan email yang terdaftar. /login`);
+    const email = await getAuthEmail(ctx.from.id);
+    if (!email) return ctx.reply(`⛔ *Akses Terkunci!* /login dulu brow.`);
 
     const userPrompt = ctx.message.text.replace('/image ', '');
-    if (!userPrompt || userPrompt === '/image') {
-        return ctx.reply('Masukkan promptnya brow! Contoh: /image cyberpunk city');
-    }
+    if (!userPrompt || userPrompt === '/image') return ctx.reply('Masukkan prompt! Contoh: /image cyberpunk city');
 
-    const loadingMsg = await ctx.reply(`⏳ Ailabs gen pro sedang merender gambar untuk: "${userPrompt}"...`);
-
+    const loadingMsg = await ctx.reply(`⏳ Merender gambar...`);
     try {
-        const finalPrompt = `${userPrompt}, highly detailed, photorealistic, cinematic lighting, consistent facial structure, face lock, perfect skin texture, 8k`;
-
         const response = await axios.post(
             'https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5',
-            { inputs: finalPrompt },
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.HF_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                responseType: 'arraybuffer' 
-            }
+            { inputs: `${userPrompt}, highly detailed, 8k` },
+            { headers: { 'Authorization': `Bearer ${process.env.HF_TOKEN}` }, responseType: 'arraybuffer' }
         );
-
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        await ctx.replyWithPhoto(
-            { source: Buffer.from(response.data) },
-            { caption: `🎨 Prompt: ${userPrompt}\n👤 Di-generate oleh: ${email}\n\n✨ Aplikasi oleh Bangpro` }
-        );
+        await ctx.replyWithPhoto({ source: Buffer.from(response.data) }, { caption: `🎨 Prompt: ${userPrompt}` });
     } catch (error) {
-        try { await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id); } catch (e) {}
-        await ctx.reply('Ada kendala teknis saat render gambar, brow. Coba lagi nanti ya.');
+        try { await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id); } catch(e){}
+        await ctx.reply('Ada kendala teknis saat render gambar.');
     }
 });
 
-// --- FITUR MENU VIDEO ---
+// ==========================================
+// MENU VIDEO & MOTION CONTROL (UPLOAD STEP-BY-STEP)
+// ==========================================
 bot.command('video', async (ctx) => {
     const email = await getAuthEmail(ctx.from.id);
-    if (!email) return ctx.replyWithMarkdown(`⛔ *Akses Terkunci!*\nSilakan /login terlebih dahulu.`);
+    if (!email) return ctx.reply(`⛔ Silakan /login terlebih dahulu.`);
 
     ctx.replyWithMarkdown(
         `🎬 *Buat Video AI*\n\nPilih model AI yang ingin digunakan:`,
         Markup.inlineKeyboard([
-            [Markup.button.url('👤 Follow Admin (Wajib)', 'https://www.facebook.com/profile.php?id=61556333717173')],
             [Markup.button.callback('🎭 Motion Control', 'model_motion')],
             [Markup.button.callback('⚡ LTX 2.0', 'model_ltx')],
-            [Markup.button.callback('🔑 Pengaturan API Key', 'menu_apikey')],
-            [Markup.button.callback('⬅️ Kembali', 'main_menu')]
+            [Markup.button.callback('🔑 Pengaturan API Key', 'menu_apikey')]
         ])
     );
 });
 
-// --- [PERBAIKAN] HANDLING TOMBOL MOTION CONTROL ---
+// 1. User klik Motion Control -> Minta Foto
 bot.action('model_motion', async (ctx) => { 
     ctx.answerCbQuery(); 
     const userId = ctx.from.id;
 
-    const email = await getAuthEmail(userId);
-    if (!email) return ctx.reply('⛔ Sesi expired, silakan /login kembali.');
-
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) {
-        return ctx.replyWithMarkdown(`⚠️ Kamu belum memasukkan API Key untuk Motion Control.\nSilakan gunakan menu *Pengaturan API Key* atau perintah /apikey.`);
-    }
+    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key Magnific. Gunakan /apikey.`);
 
-    // Ubah respon menjadi instruksi pemakaian
-    ctx.replyWithMarkdown(
-        `🎭 *Kling 3 Standard - Motion Control Siap!*\n\n` +
-        `Untuk membuat video, ketik perintah ini dan sertakan URL Gambar dan URL Video referensi:\n\n` +
-        `\`/motion <URL_GAMBAR> <URL_VIDEO>\`\n\n` +
-        `*Contoh:*\n\`/motion https://web.com/gambar.jpg https://web.com/video.mp4\``
-    ); 
+    // Set state nunggu foto
+    await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO' });
+    ctx.replyWithMarkdown(`🎭 *Motion Control*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** karakter referensinya ke sini.`); 
 });
 
-bot.action('model_ltx', async (ctx) => { 
-    ctx.answerCbQuery(); 
-    const email = await getAuthEmail(ctx.from.id);
-    if (!email) return;
-    ctx.reply('Fitur LTX 2.0 segera hadir untuk Mbelgedez Squad! ⚡'); 
-});
+bot.action('model_ltx', (ctx) => { ctx.answerCbQuery(); ctx.reply('Fitur LTX 2.0 segera hadir! ⚡'); });
+bot.action('menu_apikey', (ctx) => { ctx.answerCbQuery(); ctx.reply('Gunakan perintah /apikey untuk mengatur key.'); });
 
-bot.action('menu_apikey', async (ctx) => {
-    // ... [kode sama seperti sebelumnya] ...
-    ctx.answerCbQuery();
+// 2. Tangkap FOTO -> Minta Video
+bot.on('photo', async (ctx, next) => {
     const userId = ctx.from.id;
-    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
+    const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
-    ctx.replyWithMarkdown(
-        `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
-        Markup.inlineKeyboard([
-            [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
-            [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
-        ])
-    );
-});
+    if (stateDoc.exists && stateDoc.data().step === 'WAITING_PHOTO') {
+        const loadingMsg = await ctx.reply('⏳ Memproses foto...');
+        try {
+            const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+            const file = await ctx.telegram.getFile(photoId);
+            const imageUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
 
-bot.action('main_menu', (ctx) => { 
-    ctx.answerCbQuery(); 
-    ctx.reply('Kembali ke menu utama. Gunakan perintah /image atau /video.'); 
-});
+            await db.collection('userStates').doc(userId.toString()).update({
+                step: 'WAITING_VIDEO',
+                tempImageUrl: imageUrl
+            });
 
-
-// ========================================================
-// [FITUR BARU] 1. PROSES GENERATE VIDEO MOTION CONTROL
-// ========================================================
-bot.command('motion', async (ctx) => {
-    const userId = ctx.from.id;
-    const email = await getAuthEmail(userId);
-    if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
-
-    const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply('⚠️ API Key Magnific belum diatur. Gunakan /apikey');
-    const activeKey = keyDoc.data().key;
-
-    // Menangkap input URL dari user
-    const input = ctx.message.text.replace('/motion', '').trim().split(/\s+/);
-    if (input.length < 2) {
-        return ctx.replyWithMarkdown(`⚠️ *Format salah, brow!*\nPastikan kamu memasukkan URL gambar dan URL video.\n\nContoh:\n\`/motion https://web.com/gambar.jpg https://web.com/video.mp4\``);
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            return ctx.replyWithMarkdown(`✅ *Foto Diterima!*\n\nSekarang, silakan **Kirim/Upload VIDEO** gerakannya.\n_(Maks 20MB, durasi 3-30 detik)_`);
+        } catch (error) {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            return ctx.reply('❌ Gagal memproses foto.');
+        }
     }
+    return next();
+});
 
-    const imageUrl = input[0];
-    const videoUrl = input[1];
-    const loadingMsg = await ctx.reply('⏳ Mengirim instruksi ke server Magnific...');
+// 3. Tangkap VIDEO -> Eksekusi ke Magnific & Kirim Tombol Lacak
+bot.on('video', async (ctx, next) => {
+    const userId = ctx.from.id;
+    const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
-    try {
-        // Melakukan POST request untuk membuat tugas motion control
-        const response = await axios.post(
-            'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
-            {
-                image_url: imageUrl, //[cite: 5]
-                video_url: videoUrl  //[cite: 5]
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json', //[cite: 5]
-                    'x-magnific-api-key': activeKey     //[cite: 5]
-                }
-            }
-        );
+    if (stateDoc.exists && stateDoc.data().step === 'WAITING_VIDEO') {
+        const video = ctx.message.video;
+        if (video.file_size > 20000000) return ctx.reply('⚠️ Ukuran video > 20MB. Kompres dulu brow.');
 
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+        const loadingMsg = await ctx.reply('⏳ Mengirim instruksi ke server Magnific...');
         
-        // Ambil Task ID dari respon Magnific API
-        const taskId = response.data?.task_id || response.data?.data?.task_id; 
+        try {
+            const file = await ctx.telegram.getFile(video.file_id);
+            const videoUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
+            const imageUrl = stateDoc.data().tempImageUrl;
 
-        // Simpan Task ID ke database agar user mudah mengeceknya nanti
-        await db.collection('userTasks').doc(userId.toString()).set({
-            latestTaskId: taskId,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+            const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+            const activeKey = keyDoc.data().key;
 
-        ctx.replyWithMarkdown(
-            `✅ *Tugas Diterima Magnific!*\n\n` +
-            `Server sedang merender video kamu. Proses ini memakan waktu beberapa menit.\n` +
-            `**Task ID:** \`${taskId}\`\n\n` +
-            `Karena batas waktu Vercel, bot tidak bisa menunggu prosesnya. Silakan ketik perintah ini secara berkala untuk mengecek hasil:\n\n` +
-            `👉 \`/cekstatus\``
-        );
+            // POST ke Magnific API[cite: 5]
+            const response = await axios.post(
+                'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
+                { image_url: imageUrl, video_url: videoUrl }, //[cite: 5]
+                { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } } //[cite: 5]
+            );
 
-    } catch (error) {
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        const errMsg = error.response?.data?.message || error.message;
-        ctx.replyWithMarkdown(`❌ *Gagal mengirim tugas*\nError: ${errMsg}`);
+            const taskId = response.data?.task_id || response.data?.data?.task_id; 
+            await db.collection('userStates').doc(userId.toString()).delete(); // Clear state
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+
+            // Kirim pesan dengan tombol LACAK TASK persis seperti bot temanmu
+            return ctx.replyWithMarkdown(
+                `✅ *Tugas Berhasil Dikirim!*\n\n` +
+                `Task ID: \`${taskId}\`\nStatus AI: _in_progress_\n\n` +
+                `Klik tombol di bawah ini untuk melacak status render video kamu.`,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]
+                ])
+            );
+
+        } catch (error) {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            const errMsg = error.response?.data?.message || error.message;
+            return ctx.replyWithMarkdown(`❌ *Gagal mengirim tugas*\nError: ${errMsg}`);
+        }
     }
+    return next();
 });
 
-
-// ========================================================
-// [FITUR BARU] 2. CEK STATUS & AMBIL VIDEO DARI MAGNIFIC
-// ========================================================
-bot.command('cekstatus', async (ctx) => {
+// ==========================================
+// 4. LOGIKA TOMBOL LACAK TASK & ERROR HANDLING VIDEO BESAR
+// ==========================================
+bot.action(/^track_(.+)$/, async (ctx) => {
+    ctx.answerCbQuery('Mengecek status di server...');
+    const taskId = ctx.match[1];
     const userId = ctx.from.id;
-    const email = await getAuthEmail(userId);
-    if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply('⚠️ API Key Magnific belum diatur.');
+    if (!keyDoc.exists) return ctx.reply('⚠️ API Key hilang.');
     const activeKey = keyDoc.data().key;
 
-    // Ambil Task ID terakhir yang disimpan di Firestore
-    const taskDoc = await db.collection('userTasks').doc(userId.toString()).get();
-    if (!taskDoc.exists || !taskDoc.data().latestTaskId) {
-        return ctx.reply('⚠️ Kamu belum pernah melakukan generate video atau Task ID tidak ditemukan.');
-    }
-
-    const taskId = taskDoc.data().latestTaskId;
-    const loadingMsg = await ctx.reply('⏳ Mengecek status video kamu di server Magnific...');
+    const loadingMsg = await ctx.reply('⏳ Menarik data dari server...');
 
     try {
-        // Melakukan GET request untuk melihat status tugas
+        // GET task status dari Magnific[cite: 2]
         const response = await axios.get(
             `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std/${taskId}`,
-            {
-                headers: {
-                    'x-magnific-api-key': activeKey //[cite: 2]
-                }
-            }
+            { headers: { 'x-magnific-api-key': activeKey } } //[cite: 2]
         );
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-
         const taskData = response.data?.data;
-        const status = taskData?.status; // Status: CREATED, IN_PROGRESS, COMPLETED, FAILED[cite: 2]
+        const status = taskData?.status; //[cite: 2]
 
         if (status === 'COMPLETED') { //[cite: 2]
-            // Jika sukses, ambil URL video dari array `generated`[cite: 2]
-            const videoUrl = taskData.generated[0]; 
-            await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\n\nIni hasil Motion Control kamu, brow.`, parse_mode: 'Markdown' });
+            const videoUrl = taskData.generated[0]; //[cite: 2]
             
-            // Opsional: Hapus sesi task jika sudah selesai
-            await db.collection('userTasks').doc(userId.toString()).delete();
+            try {
+                // Mencoba mengirim video langsung ke chat
+                await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, parse_mode: 'Markdown' });
+            } catch (videoError) {
+                // JIKA GAGAL (karena file kebesaran > 50MB, mirip screenshot temanmu)
+                ctx.replyWithMarkdown(
+                    `⚠️ *File terlalu besar untuk dikirim langsung via Telegram.*\n\n` +
+                    `🔗 *Link Permanen (Download Langsung):*\n${videoUrl}\n\n` +
+                    `Silakan klik link di atas untuk mengunduh videonya brow!`,
+                    Markup.inlineKeyboard([[Markup.button.url('📥 Download Video', videoUrl)]])
+                );
+            }
         } 
         else if (status === 'IN_PROGRESS' || status === 'CREATED') { //[cite: 2]
-            ctx.replyWithMarkdown(`🔄 *Video Masih Diproses!*\n\nStatus saat ini: **${status}**.\nSabar ya brow, coba gunakan \`/cekstatus\` lagi dalam beberapa menit.`);
+            ctx.replyWithMarkdown(
+                `🔄 *Status AI: ${status}*\n\n` +
+                `Video masih dirender brow. Task ID: \`${taskId}\`\n\n` +
+                `Klik lacak lagi dalam beberapa menit.`,
+                Markup.inlineKeyboard([[Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]])
+            );
         } 
         else if (status === 'FAILED') { //[cite: 2]
-            ctx.replyWithMarkdown(`❌ *Pembuatan Video Gagal!*\n\nServer Magnific gagal memproses videomu (Status: **FAILED**).`);
-            await db.collection('userTasks').doc(userId.toString()).delete();
-        } 
-        else {
-            ctx.reply(`Status tidak diketahui: ${status}`);
+            ctx.reply(`❌ Pembuatan Video Gagal dari server Magnific.`);
         }
 
     } catch (error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        const errMsg = error.response?.data?.message || error.message;
-        ctx.replyWithMarkdown(`❌ *Gagal mengecek status*\nError: ${errMsg}`);
+        ctx.reply(`❌ Gagal mengecek status. Coba lagi nanti.`);
     }
 });
-
 
 // === PENGGANTI bot.launch() UNTUK VERCEL ===
 module.exports = async (req, res) => {
