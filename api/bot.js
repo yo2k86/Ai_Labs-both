@@ -164,7 +164,8 @@ bot.command('setkey', async (ctx) => {
             return ctx.replyWithMarkdown(`❌ *API Key Ditolak!* Unauthorized.`);
         } else if (error.response) {
             await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
-            return ctx.replyWithMarkdown(`✅ *API Key Disimpan (Catatan)*\nSistem menerima limitasi akun: _"${error.response.data?.message}"_`);
+            // Hapus Markdown agar pesan error asli server tidak bentrok format
+            return ctx.reply(`✅ API Key Disimpan (Catatan)\nSistem menerima limitasi akun: "${error.response.data?.message}"`);
         } else {
             return ctx.reply(`❌ Koneksi Gagal ke Magnific.`);
         }
@@ -319,7 +320,7 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
             const activeKey = keyDoc.data().key;
 
-            // Proses Request POST[cite: 5]
+            // Proses Request POST
             const response = await axios.post(
                 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
                 { image_url: imageUrl, video_url: videoUrl },
@@ -336,11 +337,12 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             await db.collection('userStates').doc(userId.toString()).delete(); 
 
             if (taskId) {
+                // BUG FIX: Mengganti format `_in_progress_` yang error di Markdown
                 await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     loadingMsg.message_id,
                     undefined,
-                    `✅ *Tugas Berhasil Dikirim!*\n\nTask ID: \`${taskId}\`\nStatus AI: _in_progress_\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
+                    `✅ *Tugas Berhasil Dikirim!*\n\nTask ID: \`${taskId}\`\nStatus AI: ⏳ In Progress\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
                     {
                         parse_mode: 'Markdown',
                         reply_markup: {
@@ -356,7 +358,8 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
 
         } catch (error) {
             const errMsg = error.response?.data?.message || error.message;
-            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ *Gagal mengirim tugas*\nError: ${errMsg}`);
+            // Menghilangkan Markdown di pesan error untuk menghindari crash jika message asli mengandung simbol aneh
+            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ Gagal mengirim tugas\nError: ${errMsg}`);
         }
     }
     return next();
@@ -379,7 +382,6 @@ bot.action(/^track_(.+)$/, async (ctx) => {
     const loadingMsg = await ctx.reply('⏳ Menarik data dari server...');
 
     try {
-        // Cek status GET ke server Magnific[cite: 2]
         const response = await axios.get(
             `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std/${taskId}`,
             { headers: { 'x-magnific-api-key': activeKey } } 
@@ -404,8 +406,10 @@ bot.action(/^track_(.+)$/, async (ctx) => {
             }
         } 
         else if (status === 'IN_PROGRESS' || status === 'CREATED') { 
+            // BUG FIX: Mengganti underscore di status (cth: IN_PROGRESS menjadi IN PROGRESS)
+            const cleanStatus = status.replace(/_/g, ' ');
             ctx.replyWithMarkdown(
-                `🔄 *Status AI: ${status}*\n\n` +
+                `🔄 *Status AI: ${cleanStatus}*\n\n` +
                 `Video masih dirender brow. Task ID: \`${taskId}\`\n\n` +
                 `Klik lacak lagi dalam beberapa menit.`,
                 Markup.inlineKeyboard([[Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]])
