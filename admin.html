@@ -74,7 +74,6 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Topbar -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div class="flex items-center gap-4">
             <img src="https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png" alt="Logo" class="w-12 md:w-16 drop-shadow-[0_0_10px_rgba(0,150,255,0.6)]">
@@ -89,12 +88,9 @@
         </div>
     </div>
 
-    <!-- Main Content Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Left Column: Add User Form & Stats -->
         <div class="space-y-6 lg:col-span-1">
-            <!-- Stats Widget -->
             <div class="glass-panel p-6 flex items-center justify-between">
                 <div>
                     <p class="text-gray-400 text-sm mb-1">Total Akses Aktif</p>
@@ -103,7 +99,6 @@
                 <svg class="w-12 h-12 text-blue-500/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             </div>
 
-            <!-- Add User Form -->
             <div class="glass-panel p-6">
                 <h3 class="text-lg font-semibold text-blue-300 mb-4 flex items-center gap-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
@@ -121,7 +116,6 @@
             </div>
         </div>
 
-        <!-- Right Column: User List Table -->
         <div class="glass-panel p-6 lg:col-span-2 flex flex-col h-[500px]">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold text-blue-300">Daftar Gmail Terdaftar</h3>
@@ -131,7 +125,6 @@
                 </div>
             </div>
 
-            <!-- Table Container with Scroll -->
             <div class="overflow-y-auto flex-1 pr-2 custom-scrollbar">
                 <table class="w-full text-left border-collapse glass-table text-sm">
                     <thead>
@@ -150,7 +143,6 @@
         </div>
     </div>
 
-    <!-- Custom Message Box -->
     <div id="messageBox" class="fixed inset-0 z-[60] hidden flex-col items-center justify-center bg-black/80 backdrop-blur-sm px-4">
         <div class="glass-panel p-6 md:p-8 max-w-sm w-full text-center border border-blue-500/30">
             <h3 class="text-lg md:text-xl font-bold text-blue-400 mb-2" id="messageTitle">Pemberitahuan</h3>
@@ -161,32 +153,66 @@
         </div>
     </div>
 
-    <!-- FIREBASE SDK & LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // =====================================================================
-        // PENTING BROW: GANTI BAGIAN INI DENGAN CONFIG FIREBASE KAMU SENDIRI!
-        // Ambil di Dashboard Firebase -> Project Settings -> General -> Your Apps (Web)
-        // =====================================================================
+        // Config Asli Punya Bangpro
         const firebaseConfig = {
-            apiKey: "ISI_API_KEY_DISINI", 
+            apiKey: "AIzaSyAda9zOqMGJmIR0HmHTn0M32vvwH3y4mU4",
             authDomain: "ailabs-new-1.firebaseapp.com",
             projectId: "ailabs-new-1",
-            storageBucket: "ailabs-new-1.appspot.com",
-            messagingSenderId: "ISI_MESSAGING_SENDER_ID",
-            appId: "ISI_APP_ID"
+            storageBucket: "ailabs-new-1.firebasestorage.app",
+            messagingSenderId: "485654286517",
+            appId: "1:485654286517:web:e8df3ca48159dcb01deefc",
+            measurementId: "G-RWD8MLEKHT"
         };
 
-        // Fungsi menampilkan pesan custom
-        window.showMessage = function(title, text) {
-            document.getElementById('messageTitle').innerText = title;
-            document.getElementById('messageText').innerText = text;
-            const msgBox = document.getElementById('messageBox');
-            msgBox.classList.remove('hidden');
-            msgBox.classList.add('flex');
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const usersCollection = collection(db, "authorizedUsers");
+
+        let currentUsers = [];
+        let userToDeleteEmail = null;
+
+        function getTodayDate() {
+            const today = new Date();
+            return today.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        window.renderTable = function(usersToRender = currentUsers) {
+            const tbody = document.getElementById('userTableBody');
+            document.getElementById('totalUsersCount').innerText = currentUsers.length;
+            tbody.innerHTML = '';
+
+            if (usersToRender.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
+                return;
+            }
+
+            usersToRender.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-medium text-gray-200">${user.email}</td>
+                    <td class="py-3 px-4 text-gray-400 text-xs">${user.date}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-[10px] font-bold tracking-wider">AKTIF</span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="confirmDelete('${user.email}')" class="btn-glow-red px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 inline-flex">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Hapus
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        window.filterUsers = function() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = currentUsers.filter(u => u.email.includes(query));
+            window.renderTable(filtered);
         };
 
         window.closeMessage = function() {
@@ -198,178 +224,110 @@
             }, 300);
         };
 
-        // Pengecekan Config
-        if (firebaseConfig.apiKey === "ISI_API_KEY_DISINI") {
-            document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
-            document.getElementById('statusText').innerText = "Config Kosong!";
-            document.getElementById('statusText').className = "text-sm font-semibold text-red-400";
-            showMessage("Konfigurasi Firebase Kosong", "Pastikan kamu sudah mengganti bagian 'ISI_API_KEY_DISINI' dengan konfigurasi Firebase milikmu di dalam kode HTML.");
-        } else {
-            // Inisialisasi Firebase App, Auth, dan Firestore
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const db = getFirestore(app);
-            const usersCollection = collection(db, "authorizedUsers");
+        function showMessage(title, text) {
+            document.getElementById('messageTitle').innerText = title;
+            document.getElementById('messageText').innerText = text;
+            const msgBox = document.getElementById('messageBox');
+            msgBox.classList.remove('hidden');
+            msgBox.classList.add('flex');
+        }
 
-            let currentUsers = [];
-            let userToDeleteEmail = null;
+        window.confirmDelete = function(email) {
+            userToDeleteEmail = email;
+            document.getElementById('messageTitle').innerText = "Cabut Akses?";
+            document.getElementById('messageText').innerText = `Yakin ingin menghapus akses untuk ${email}?`;
+            
+            const btnContainer = document.getElementById('messageButtons');
+            btnContainer.innerHTML = `
+                <button onclick="closeMessage()" class="px-6 py-2 rounded-xl text-sm font-bold text-gray-300 border border-gray-600 hover:bg-gray-800 transition-all w-full">Batal</button>
+                <button onclick="executeDelete()" id="btnYaHapus" class="btn-glow-red px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Ya, Hapus</button>
+            `;
+            
+            const msgBox = document.getElementById('messageBox');
+            msgBox.classList.remove('hidden');
+            msgBox.classList.add('flex');
+        };
 
-            function getTodayDate() {
-                const today = new Date();
-                return today.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        window.executeDelete = async function() {
+            if (!userToDeleteEmail) return;
+            
+            const btnYa = document.getElementById('btnYaHapus');
+            if (btnYa) {
+                btnYa.innerText = "Sedang Menghapus...";
+                btnYa.disabled = true;
+                btnYa.classList.add('opacity-50', 'cursor-wait');
             }
 
-            // Render Table
-            window.renderTable = function(usersToRender = currentUsers) {
-                const tbody = document.getElementById('userTableBody');
-                document.getElementById('totalUsersCount').innerText = currentUsers.length;
-                tbody.innerHTML = '';
+            try {
+                await deleteDoc(doc(db, "authorizedUsers", userToDeleteEmail));
+                document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
+                document.getElementById('messageTitle').innerText = "Berhasil Dihapus!";
+                document.getElementById('messageText').innerText = `Akses untuk ${userToDeleteEmail} berhasil dicabut dari sistem.`;
+                userToDeleteEmail = null;
+            } catch (error) {
+                console.error("Error: ", error);
+                document.getElementById('messageTitle').innerText = "Gagal Menghapus";
+                document.getElementById('messageText').innerText = "Terjadi kesalahan: " + error.message;
+                document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
+            }
+        };
 
-                if (usersToRender.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-gray-500">Tidak ada data ditemukan</td></tr>`;
-                    return;
-                }
-
-                usersToRender.forEach(user => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="py-3 px-4 font-medium text-gray-200">${user.email}</td>
-                        <td class="py-3 px-4 text-gray-400 text-xs">${user.date}</td>
-                        <td class="py-3 px-4 text-center">
-                            <span class="bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded-full text-[10px] font-bold tracking-wider">AKTIF</span>
-                        </td>
-                        <td class="py-3 px-4 text-right">
-                            <button onclick="confirmDelete('${user.email}')" class="btn-glow-red px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 inline-flex">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                Hapus
-                            </button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
+        // --- LISTENER REALTIME DARI FIRESTORE ---
+        onSnapshot(usersCollection, (snapshot) => {
+            currentUsers = [];
+            snapshot.forEach((docSnap) => {
+                currentUsers.push({
+                    email: docSnap.data().email,
+                    date: docSnap.data().dateAdded || '-',
+                    timestamp: docSnap.data().timestamp || 0
                 });
-            };
-
-            window.filterUsers = function() {
-                const query = document.getElementById('searchInput').value.toLowerCase();
-                const filtered = currentUsers.filter(u => u.email.includes(query));
-                window.renderTable(filtered);
-            };
-
-            window.confirmDelete = function(email) {
-                userToDeleteEmail = email;
-                document.getElementById('messageTitle').innerText = "Cabut Akses?";
-                document.getElementById('messageText').innerText = `Yakin ingin menghapus akses untuk ${email}? Mereka tidak akan bisa masuk ke aplikasi bot lagi.`;
-                
-                const btnContainer = document.getElementById('messageButtons');
-                btnContainer.innerHTML = `
-                    <button onclick="closeMessage()" class="px-6 py-2 rounded-xl text-sm font-bold text-gray-300 border border-gray-600 hover:bg-gray-800 transition-all w-full">Batal</button>
-                    <button onclick="executeDelete()" id="btnYaHapus" class="btn-glow-red px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Ya, Hapus</button>
-                `;
-                
-                const msgBox = document.getElementById('messageBox');
-                msgBox.classList.remove('hidden');
-                msgBox.classList.add('flex');
-            };
-
-            window.executeDelete = async function() {
-                if (!userToDeleteEmail) return;
-                
-                const btnYa = document.getElementById('btnYaHapus');
-                if (btnYa) {
-                    btnYa.innerText = "Sedang Menghapus...";
-                    btnYa.disabled = true;
-                    btnYa.classList.add('opacity-50', 'cursor-wait');
-                }
-
-                try {
-                    await deleteDoc(doc(db, "authorizedUsers", userToDeleteEmail));
-                    
-                    document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
-                    document.getElementById('messageTitle').innerText = "Berhasil Dihapus!";
-                    document.getElementById('messageText').innerText = `Akses untuk ${userToDeleteEmail} berhasil dicabut dari sistem.`;
-                    userToDeleteEmail = null;
-                } catch (error) {
-                    console.error("Error saat menghapus: ", error);
-                    document.getElementById('messageTitle').innerText = "Gagal Menghapus";
-                    document.getElementById('messageText').innerText = "Terjadi kesalahan: " + error.message;
-                    document.getElementById('messageButtons').innerHTML = `<button onclick="closeMessage()" class="btn-glow-blue px-6 py-2 rounded-xl text-sm font-bold text-white w-full">Tutup</button>`;
-                }
-            };
-
-            // --- PROSES AUTENTIKASI ANONIM & REALTIME LISTENER ---
-            // Autentikasi diperlukan agar Firebase tidak menolak akses meskipun rules sudah publik
-            signInAnonymously(auth).then(() => {
-                onSnapshot(usersCollection, (snapshot) => {
-                    currentUsers = [];
-                    snapshot.forEach((docSnap) => {
-                        currentUsers.push({
-                            email: docSnap.data().email,
-                            date: docSnap.data().dateAdded || '-',
-                            timestamp: docSnap.data().timestamp || 0
-                        });
-                    });
-
-                    currentUsers.sort((a, b) => b.timestamp - a.timestamp);
-                    window.renderTable();
-
-                    document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse";
-                    document.getElementById('statusText').innerText = "Sistem Online";
-                    document.getElementById('statusText').className = "text-sm font-semibold text-green-400";
-                }, (error) => {
-                    console.error(error);
-                    document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
-                    
-                    if (error.code === 'permission-denied') {
-                        document.getElementById('statusText').innerText = "Izin Ditolak";
-                        showMessage("Izin Firebase Terkunci", "Aturan (Rules) Firebase belum sepenuhnya diperbarui. Biasanya butuh 1-2 menit setelah kamu klik Publish di console. Coba refresh halaman ini sebentar lagi.");
-                    } else {
-                        document.getElementById('statusText').innerText = "Koneksi Terputus";
-                    }
-                    document.getElementById('statusText').className = "text-sm font-semibold text-red-400";
-                });
-            }).catch((error) => {
-                console.error("Auth Error:", error);
-                document.getElementById('statusText').innerText = "Gagal Autentikasi";
-                document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
             });
 
-            // --- TAMBAH DATA KE FIRESTORE ---
-            document.getElementById('addUserForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const emailInput = document.getElementById('newUserEmail');
-                const btn = document.getElementById('addBtn');
-                const email = emailInput.value.trim().toLowerCase();
+            currentUsers.sort((a, b) => b.timestamp - a.timestamp);
+            window.renderTable();
 
-                if (currentUsers.find(u => u.email === email)) {
-                    showMessage("Peringatan", `Email ${email} sudah terdaftar di sistem!`);
-                    return;
-                }
+            document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse";
+            document.getElementById('statusText').innerText = "Sistem Online";
+            document.getElementById('statusText').className = "text-sm font-semibold text-green-400";
+        }, (error) => {
+            console.error(error);
+            document.getElementById('statusDot').className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
+            document.getElementById('statusText').innerText = "Koneksi Terputus";
+            document.getElementById('statusText').className = "text-sm font-semibold text-red-400";
+        });
 
-                btn.innerText = "Menyimpan...";
-                btn.disabled = true;
+        // --- TAMBAH DATA KE FIRESTORE ---
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('newUserEmail');
+            const btn = document.getElementById('addBtn');
+            const email = emailInput.value.trim().toLowerCase();
 
-                try {
-                    await setDoc(doc(db, "authorizedUsers", email), {
-                        email: email,
-                        dateAdded: getTodayDate(),
-                        timestamp: Date.now()
-                    });
-                    
-                    emailInput.value = '';
-                    showMessage("Sukses!", `Akses untuk ${email} berhasil ditambahkan ke database.`);
-                } catch (error) {
-                    console.error(error);
-                    if (error.code === 'permission-denied') {
-                        showMessage("Akses Ditolak", "Firebase menolak permintaan karena aturan keamanan. Tunggu 1-2 menit agar Rules Firebase aktif.");
-                    } else {
-                        showMessage("Error", "Gagal menyimpan: " + error.message);
-                    }
-                } finally {
-                    btn.innerText = "Berikan Akses";
-                    btn.disabled = false;
-                }
-            });
-        }
+            if (currentUsers.find(u => u.email === email)) {
+                showMessage("Peringatan", `Email ${email} sudah terdaftar di sistem!`);
+                return;
+            }
+
+            btn.innerText = "Menyimpan...";
+            btn.disabled = true;
+
+            try {
+                await setDoc(doc(db, "authorizedUsers", email), {
+                    email: email,
+                    dateAdded: getTodayDate(),
+                    timestamp: Date.now()
+                });
+                
+                emailInput.value = '';
+                showMessage("Sukses!", `Akses untuk ${email} berhasil ditambahkan ke database.`);
+            } catch (error) {
+                console.error(error);
+                showMessage("Error", "Gagal menyimpan. Pastikan config Firebase kamu sudah benar.");
+            } finally {
+                btn.innerText = "Berikan Akses";
+                btn.disabled = false;
+            }
+        });
     </script>
 </body>
 </html>
