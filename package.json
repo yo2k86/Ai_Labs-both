@@ -1,0 +1,10 @@
+{
+  "name": "ailabs-bot",
+  "version": "1.0.0",
+  "description": "Telegram Bot Ailabs gen pro",
+  "main": "api/bot.js",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "telegraf": "^4.15.0"
+  }
+}
