@@ -1,6 +1,9 @@
-
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
+
+// Objek sementara untuk menyimpan API Key user 
+// (CATATAN: Karena di Vercel, data ini akan hilang kalau server sedang sleep/restart. Idealnya nanti pakai database seperti Firebase/Firestore)
+const userApiKeys = {};
 
 // Di Vercel, kita gak perlu require('dotenv').config() karena env diatur di dashboard Vercel
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -11,7 +14,9 @@ bot.start((ctx) => {
         `Halo, ${ctx.from.first_name}! 👋 Selamat datang di *Ailabs gen pro*.\n\n` +
         `Gunakan perintah ini untuk mulai berkarya:\n` +
         `🖼️ /image [prompt] - Generate Gambar AI\n` +
-        `🎬 /video - Menu Pembuatan Video AI\n\n` +
+        `🎬 /video - Menu Pembuatan Video AI\n` +
+        `🔑 /setapikey [key] - Masukkan API Key Motion Control\n` +
+        `🗑️ /resetapikey - Hapus API Key kamu\n\n` +
         `✨ *Aplikasi oleh Bangpro*`
     );
 });
@@ -36,6 +41,40 @@ bot.on('new_chat_members', (ctx) => {
             );
         }
     });
+});
+
+// --- FITUR SET API KEY MOTION CONTROL ---
+bot.command('setapikey', (ctx) => {
+    const apiKey = ctx.message.text.replace('/setapikey', '').trim();
+    const userId = ctx.from.id;
+
+    if (!apiKey) {
+        return ctx.replyWithMarkdown(
+            `Ketik perintahnya beserta API Key kamu ya, brow.\n\n` +
+            `*Contoh:*\n\`/setapikey abs123456789xyz\``
+        );
+    }
+
+    userApiKeys[userId] = apiKey;
+    ctx.replyWithMarkdown(
+        `✅ *API Key Berhasil Disimpan!*\n\n` +
+        `API Key kamu sudah aktif dan siap digunakan untuk fitur Motion Control.`
+    );
+});
+
+// --- FITUR RESET API KEY ---
+bot.command('resetapikey', (ctx) => {
+    const userId = ctx.from.id;
+
+    if (userApiKeys[userId]) {
+        delete userApiKeys[userId];
+        ctx.replyWithMarkdown(
+            `🗑️ *API Key Berhasil Direset!*\n\n` +
+            `Sistem sudah menghapus API Key kamu. Silakan gunakan \`/setapikey [kunci_baru]\` jika ingin memasukkan yang baru.`
+        );
+    } else {
+        ctx.reply('Kamu belum menyimpan API Key apapun, brow. Tidak ada yang perlu direset.');
+    }
 });
 
 // --- FITUR GENERATE IMAGE ---
@@ -91,9 +130,24 @@ bot.command('video', (ctx) => {
 });
 
 // --- HANDLING TOMBOL ---
-bot.action('model_motion', (ctx) => { ctx.answerCbQuery(); ctx.reply('Fitur Motion Control sedang diproses di dapur Ailabs gen pro! ⏳'); });
+bot.action('model_motion', (ctx) => { 
+    ctx.answerCbQuery(); 
+    const userId = ctx.from.id;
+
+    // Cek apakah user sudah set API key
+    if (!userApiKeys[userId]) {
+        return ctx.replyWithMarkdown(
+            `⚠️ Kamu belum memasukkan API Key untuk Motion Control.\n\n` +
+            `Silakan masukkan API key kamu dengan format:\n\`/setapikey [API_KEY_KAMU]\``
+        );
+    }
+
+    const activeKey = userApiKeys[userId];
+    ctx.reply(`Sistem memproses Motion Control dengan API Key kamu... (Key aktif: ${activeKey.substring(0, 5)}***) ⏳\n\n_(Fitur integrasi API videonya nyusul di dapur Ailabs gen pro!)_`); 
+});
+
 bot.action('model_ltx', (ctx) => { ctx.answerCbQuery(); ctx.reply('Fitur LTX 2.0 segera hadir untuk Mbelgedez Squad! ⚡'); });
-bot.action('main_menu', (ctx) => { ctx.answerCbQuery(); ctx.reply('Kembali ke menu utama.'); });
+bot.action('main_menu', (ctx) => { ctx.answerCbQuery(); ctx.reply('Kembali ke menu utama. Gunakan perintah /image atau /video.'); });
 
 // === PENTING: PENGGANTI bot.launch() UNTUK VERCEL ===
 module.exports = async (req, res) => {
