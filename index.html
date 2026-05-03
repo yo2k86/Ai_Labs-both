@@ -222,7 +222,7 @@
     <!-- FIREBASE & LOGIC APLIKASI -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Konfigurasi Firebase Bangpro
         const firebaseConfig = {
@@ -278,6 +278,13 @@
 
                 if (docSnap.exists()) {
                     // Berhasil Login
+                    // --- TRACKING: Update waktu terakhir aktif ---
+                    try {
+                        await updateDoc(userRef, {
+                            lastActive: new Date().toLocaleString('id-ID')
+                        });
+                    } catch (e) { console.error("Gagal update lastActive", e); }
+
                     document.getElementById('authSection').classList.add('hidden');
                     document.getElementById('appSection').classList.remove('hidden');
                     document.getElementById('activeUserEmail').innerText = email;
@@ -362,9 +369,19 @@
             console.log("Menggunakan API Key:", MOTION_API_KEY);
 
             // Simulasi proses render menggunakan API Key
-            setTimeout(() => {
+            setTimeout(async () => {
                 loadingOverlay.classList.add('hidden');
                 loadingOverlay.classList.remove('flex');
+
+                // --- TRACKING: Tambah jumlah render user ---
+                try {
+                    const activeEmail = document.getElementById('activeUserEmail').innerText;
+                    const userRef = doc(db, "authorizedUsers", activeEmail);
+                    await updateDoc(userRef, {
+                        usageCount: increment(1),
+                        lastActive: new Date().toLocaleString('id-ID')
+                    });
+                } catch (e) { console.error("Gagal update aktivitas", e); }
                 
                 const resultContainer = document.getElementById('resultContainer');
                 const resultVideo = document.getElementById('resultVideo');
