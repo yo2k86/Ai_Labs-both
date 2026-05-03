@@ -47,6 +47,8 @@ bot.command('login', async (ctx) => {
 
     if (!email) return ctx.replyWithMarkdown(`Masukkan email kamu, brow!\n*Contoh:*\n\`/login emailkamu@gmail.com\``);
 
+    // [LOADING] Mengaktifkan status "sedang mengetik..."
+    await ctx.sendChatAction('typing');
     const loadingMsg = await ctx.reply('⏳ Sedang memverifikasi akses ke database Ailabs...');
 
     try {
@@ -88,6 +90,7 @@ bot.command('logout', async (ctx) => {
 });
 
 bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
+    await ctx.sendChatAction('typing');
     const email = await getAuthEmail(ctx.from.id);
     let msg = `Halo, ${ctx.from.first_name}! Ada yang bisa *Ailabs gen pro* bantu? 🤖\n\n`;
     if (email) {
@@ -106,6 +109,7 @@ bot.command('apikey', async (ctx) => {
     const email = await getAuthEmail(userId);
     if (!email) return ctx.reply('⛔ Kamu harus /login terlebih dahulu!');
 
+    await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
     let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
 
@@ -148,6 +152,7 @@ bot.command('setkey', async (ctx) => {
     const apiKey = ctx.message.text.replace('/setkey', '').trim();
     if (!apiKey) return ctx.reply('⚠️ Format salah! Gunakan: /setkey abcdef12345');
 
+    await ctx.sendChatAction('typing');
     const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key...');
     try {
         await axios.get('https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std', { headers: { 'x-magnific-api-key': apiKey } });
@@ -167,12 +172,13 @@ bot.command('setkey', async (ctx) => {
     }
 });
 
-// Listener untuk API Key via Reply
 bot.on('text', async (ctx, next) => {
     const isReply = ctx.message.reply_to_message && ctx.message.reply_to_message.text;
     if (isReply && ctx.message.reply_to_message.text.includes('balas (reply) pesan ini dengan API Key')) {
         const userId = ctx.from.id;
         const apiKey = ctx.message.text.trim();
+        
+        await ctx.sendChatAction('typing');
         const loadingMsg = await ctx.reply('⏳ Memverifikasi API Key...');
         
         try {
@@ -203,6 +209,8 @@ bot.command('image', async (ctx) => {
     const userPrompt = ctx.message.text.replace('/image ', '');
     if (!userPrompt || userPrompt === '/image') return ctx.reply('Masukkan prompt! Contoh: /image cyberpunk city');
 
+    // [LOADING] Status upload foto
+    await ctx.sendChatAction('upload_photo');
     const loadingMsg = await ctx.reply(`⏳ Merender gambar...`);
     try {
         const response = await axios.post(
@@ -225,6 +233,7 @@ bot.command('video', async (ctx) => {
     const email = await getAuthEmail(ctx.from.id);
     if (!email) return ctx.reply(`⛔ Silakan /login terlebih dahulu.`);
 
+    await ctx.sendChatAction('typing');
     ctx.replyWithMarkdown(
         `🎬 *Buat Video AI*\n\nPilih model AI yang ingin digunakan:`,
         Markup.inlineKeyboard([
@@ -235,15 +244,14 @@ bot.command('video', async (ctx) => {
     );
 });
 
-// 1. User klik Motion Control -> Minta Foto
 bot.action('model_motion', async (ctx) => { 
     ctx.answerCbQuery(); 
     const userId = ctx.from.id;
 
+    await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
     if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key Magnific. Gunakan /apikey.`);
 
-    // Set state nunggu foto
     await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO' });
     ctx.replyWithMarkdown(`🎭 *Motion Control*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** karakter referensinya ke sini.`); 
 });
@@ -251,13 +259,15 @@ bot.action('model_motion', async (ctx) => {
 bot.action('model_ltx', (ctx) => { ctx.answerCbQuery(); ctx.reply('Fitur LTX 2.0 segera hadir! ⚡'); });
 bot.action('menu_apikey', (ctx) => { ctx.answerCbQuery(); ctx.reply('Gunakan perintah /apikey untuk mengatur key.'); });
 
-// 2. Tangkap FOTO -> Minta Video
 bot.on('photo', async (ctx, next) => {
     const userId = ctx.from.id;
     const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
     if (stateDoc.exists && stateDoc.data().step === 'WAITING_PHOTO') {
-        const loadingMsg = await ctx.reply('⏳ Memproses foto...');
+        // [LOADING] Status mengetik
+        await ctx.sendChatAction('typing');
+        const loadingMsg = await ctx.reply('⏳ Memproses foto referensi...');
+        
         try {
             const photoId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
             const file = await ctx.telegram.getFile(photoId);
@@ -278,7 +288,6 @@ bot.on('photo', async (ctx, next) => {
     return next();
 });
 
-// 3. Tangkap VIDEO, ANIMASI, ATAU DOKUMEN -> Eksekusi ke Magnific
 bot.on(['video', 'animation', 'document'], async (ctx, next) => {
     const userId = ctx.from.id;
     const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
@@ -302,7 +311,9 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             return ctx.reply('⚠️ Ukuran video terlalu besar (> 20MB). Telegram membatasi bot, tolong kompres dulu ya brow.');
         }
 
-        const loadingMsg = await ctx.reply('⏳ Membaca video & mengirim instruksi ke server Magnific...');
+        // [LOADING] Status upload video di bagian atas chat
+        await ctx.sendChatAction('upload_video');
+        const loadingMsg = await ctx.reply('⏳ Sedang memproses dan mengupload ke Magnific...\n_Proses ini butuh waktu beberapa detik._');
         
         try {
             const file = await ctx.telegram.getFile(media.file_id);
@@ -312,31 +323,44 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
             const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
             const activeKey = keyDoc.data().key;
 
-            // POST ke Magnific API[cite: 5]
+            // POST task ke Magnific[cite: 5]
             const response = await axios.post(
                 'https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std',
-                { image_url: imageUrl, video_url: videoUrl }, //[cite: 5]
-                { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } } //[cite: 5]
+                { image_url: imageUrl, video_url: videoUrl },[cite: 5]
+                { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } }[cite: 5]
             );
 
-            const taskId = response.data?.task_id || response.data?.data?.task_id; 
+            const taskId = response.data?.task_id || response.data?.data?.task_id || response.data?.id; 
             
-            await db.collection('userStates').doc(userId.toString()).delete(); // Clear state
-            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+            await db.collection('userTasks').doc(userId.toString()).set({
+                latestTaskId: taskId,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
 
-            return ctx.replyWithMarkdown(
-                `✅ *Tugas Berhasil Dikirim!*\n\n` +
-                `Task ID: \`${taskId}\`\nStatus AI: _in_progress_\n\n` +
-                `Klik tombol di bawah ini untuk melacak status render video kamu.`,
-                Markup.inlineKeyboard([
-                    [Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]
-                ])
-            );
+            await db.collection('userStates').doc(userId.toString()).delete(); 
+
+            if (taskId) {
+                await ctx.telegram.editMessageText(
+                    ctx.chat.id,
+                    loadingMsg.message_id,
+                    undefined,
+                    `✅ *Tugas Berhasil Dikirim!*\n\nTask ID: \`${taskId}\`\nStatus AI: _in_progress_\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '🔍 Lacak Task Ini', callback_data: `track_${taskId}` }]
+                            ]
+                        }
+                    }
+                );
+            } else {
+                await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `⚠️ Tugas terkirim tapi Task ID tidak terbaca. Coba ulangi.`);
+            }
 
         } catch (error) {
-            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
             const errMsg = error.response?.data?.message || error.message;
-            return ctx.replyWithMarkdown(`❌ *Gagal mengirim tugas*\nError: ${errMsg}`);
+            await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `❌ *Gagal mengirim tugas*\nError: ${errMsg}`);
         }
     }
     return next();
@@ -346,9 +370,12 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
 // 4. LOGIKA TOMBOL LACAK TASK & ERROR HANDLING VIDEO BESAR
 // ==========================================
 bot.action(/^track_(.+)$/, async (ctx) => {
-    ctx.answerCbQuery('Mengecek status di server...');
+    ctx.answerCbQuery('Mengecek status di server...'); // Pop-up notifikasi kecil di tombol
     const taskId = ctx.match[1];
     const userId = ctx.from.id;
+
+    // [LOADING] Status upload video di atas chat
+    await ctx.sendChatAction('upload_video');
 
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
     if (!keyDoc.exists) return ctx.reply('⚠️ API Key hilang.');
@@ -357,18 +384,18 @@ bot.action(/^track_(.+)$/, async (ctx) => {
     const loadingMsg = await ctx.reply('⏳ Menarik data dari server...');
 
     try {
-        // GET task status dari Magnific[cite: 2]
+        // GET status task dari Magnific[cite: 2]
         const response = await axios.get(
             `https://api.magnific.com/v1/ai/video/kling-v3-motion-control-std/${taskId}`,
-            { headers: { 'x-magnific-api-key': activeKey } } //[cite: 2]
+            { headers: { 'x-magnific-api-key': activeKey } }[cite: 2]
         );
 
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         const taskData = response.data?.data;
-        const status = taskData?.status; //[cite: 2]
+        const status = taskData?.status;[cite: 2]
 
-        if (status === 'COMPLETED') { //[cite: 2]
-            const videoUrl = taskData.generated[0]; //[cite: 2]
+        if (status === 'COMPLETED') {[cite: 2]
+            const videoUrl = taskData.generated[0];[cite: 2]
             
             try {
                 await ctx.replyWithVideo({ url: videoUrl }, { caption: `✅ *Video Selesai!*\nTask ID: \`${taskId}\``, parse_mode: 'Markdown' });
@@ -381,7 +408,7 @@ bot.action(/^track_(.+)$/, async (ctx) => {
                 );
             }
         } 
-        else if (status === 'IN_PROGRESS' || status === 'CREATED') { //[cite: 2]
+        else if (status === 'IN_PROGRESS' || status === 'CREATED') {[cite: 2]
             ctx.replyWithMarkdown(
                 `🔄 *Status AI: ${status}*\n\n` +
                 `Video masih dirender brow. Task ID: \`${taskId}\`\n\n` +
@@ -389,7 +416,7 @@ bot.action(/^track_(.+)$/, async (ctx) => {
                 Markup.inlineKeyboard([[Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]])
             );
         } 
-        else if (status === 'FAILED') { //[cite: 2]
+        else if (status === 'FAILED') {[cite: 2]
             ctx.reply(`❌ Pembuatan Video Gagal dari server Magnific.`);
         }
 
@@ -397,6 +424,27 @@ bot.action(/^track_(.+)$/, async (ctx) => {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         ctx.reply(`❌ Gagal mengecek status. Coba lagi nanti.`);
     }
+});
+
+// ==========================================
+// FITUR DARURAT: PANGGIL TASK TERAKHIR
+// ==========================================
+bot.command('lacak', async (ctx) => {
+    await ctx.sendChatAction('typing');
+    const userId = ctx.from.id;
+    const taskDoc = await db.collection('userTasks').doc(userId.toString()).get();
+    
+    if (!taskDoc.exists || !taskDoc.data().latestTaskId) {
+        return ctx.reply('⚠️ Kamu belum pernah memproses video atau Task ID tidak ditemukan brow.');
+    }
+    
+    const taskId = taskDoc.data().latestTaskId;
+    ctx.replyWithMarkdown(
+        `🔍 *Task Video Terakhir Kamu:*\n\`${taskId}\`\n\nKlik tombol di bawah ini untuk mengecek statusnya di Magnific:`,
+        Markup.inlineKeyboard([
+            [Markup.button.callback('🔍 Lacak Task Ini', `track_${taskId}`)]
+        ])
+    );
 });
 
 // === PENGGANTI bot.launch() UNTUK VERCEL ===
