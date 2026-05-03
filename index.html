@@ -229,7 +229,6 @@
             <div class="loading-ring"></div>
             <img src="https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png" alt="Loading Logo" class="w-full h-full object-contain rounded-full p-2 bg-black/60 shadow-[0_0_20px_rgba(0,150,255,0.4)]">
         </div>
-        <!-- Teks dibuat dinamis untuk menunjukkan proses -->
         <p id="loadingText" class="text-[13px] md:text-xl font-semibold text-blue-400 tracking-widest animate-pulse drop-shadow-[0_0_8px_rgba(0,150,255,0.8)] text-center px-4 max-w-lg">
             Menyiapkan data Ailabs...
         </p>
@@ -244,14 +243,14 @@
         </div>
     </div>
 
-    <!-- FIREBASE SDK & MAGNIFIC LOGIC -->
+    <!-- FIREBASE SDK & APP LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, getDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        // Tambahkan import Firebase Storage untuk mengupload gambar dan video
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        
+        // HAPUS IMPORT FIREBASE STORAGE, KITA SUDAH TIDAK PAKAI LAGI
 
-        // Konfigurasi Firebase Bangpro
+        // Konfigurasi Firebase Bangpro (Hanya untuk Login / Cek Akses)
         const firebaseConfig = {
             apiKey: "AIzaSyAda9zOqMGJmIR0HmHTn0M32vvwH3y4mU4",
             authDomain: "ailabs-new-1.firebaseapp.com",
@@ -263,7 +262,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const storage = getStorage(app); // Inisialisasi Storage
 
         // Variabel untuk menyimpan API Key dari input user
         window.currentApiKey = "";
@@ -283,7 +281,7 @@
             msgBox.classList.remove('flex');
         };
 
-        // --- SISTEM LOGIN ---
+        // --- SISTEM LOGIN (TETAP PAKAI FIRESTORE AGAR AMAN) ---
         window.verifyAccess = async function() {
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const btn = document.getElementById('verifyBtn');
@@ -400,7 +398,36 @@
             }
         };
 
-        // --- SISTEM GENERATE (FIREBASE STORAGE + MAGNIFIC API) ---
+        // ========================================================
+        // FUNGSI BARU: UPLOAD KE SERVER GRATIS (CATBOX.MOE)
+        // BEBAS CORS & TIDAK PERLU API KEY PENYIMPANAN
+        // ========================================================
+        async function uploadToFreeServer(file) {
+            const formData = new FormData();
+            formData.append('reqtype', 'fileupload');
+            formData.append('fileToUpload', file);
+
+            try {
+                // Catbox.moe mengizinkan akses publik untuk diubah jadi link
+                const response = await fetch('https://catbox.moe/user/api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error("Gagal mengunggah file ke server penyimpanan publik.");
+                }
+
+                // Catbox mengembalikan URL langsung dalam bentuk teks (bukan JSON)
+                const publicUrl = await response.text();
+                return publicUrl;
+            } catch (err) {
+                console.error("Upload error:", err);
+                throw new Error("Sistem penyimpanan publik (Catbox) sedang menolak koneksi. Coba lagi nanti.");
+            }
+        }
+
+        // --- SISTEM GENERATE MOTION CONTROL DENGAN MAGNIFIC API ---
         window.startGeneration = async function() {
             const photoInput = document.getElementById('photoInput');
             const videoInput = document.getElementById('videoInput');
@@ -410,7 +437,7 @@
             const loadingText = document.getElementById('loadingText');
 
             if(photoInput.files.length === 0 || videoInput.files.length === 0) {
-                window.showMessage("Peringatan", "Brow, pastikan Foto dan Video referensinya sudah di-upload dulu ya!");
+                window.showMessage("Peringatan", "Brow, pastikan Foto dan Video referensinya sudah dimasukkan dulu ya!");
                 return;
             }
 
@@ -437,18 +464,13 @@
             try {
                 const photoFile = photoInput.files[0];
                 const videoFile = videoInput.files[0];
-                const timestamp = Date.now();
 
-                // 1. UPLOAD FILE KE FIREBASE STORAGE
-                loadingText.innerText = "Mengunggah bahan ke Firebase Storage...";
-                
-                const photoRef = ref(storage, `motion_inputs/${timestamp}_${photoFile.name}`);
-                await uploadBytesResumable(photoRef, photoFile);
-                const photoPublicUrl = await getDownloadURL(photoRef);
+                // 1. UPLOAD FILE KE SERVER PUBLIK (CATBOX) ALIH-ALIH FIREBASE
+                loadingText.innerText = "Mengunggah Foto Wajah ke server publik...";
+                const photoPublicUrl = await uploadToFreeServer(photoFile);
 
-                const videoRef = ref(storage, `motion_inputs/${timestamp}_${videoFile.name}`);
-                await uploadBytesResumable(videoRef, videoFile);
-                const videoPublicUrl = await getDownloadURL(videoRef);
+                loadingText.innerText = "Mengunggah Video Referensi ke server publik (Bisa agak lama tergantung ukuran)...";
+                const videoPublicUrl = await uploadToFreeServer(videoFile);
 
                 // 2. TEMBAK MAGNIFIC API (START TASK DENGAN MODEL DINAMIS)
                 const modelName = modelSelect === 'pro' ? 'Kling 3 Pro' : 'Kling 3 Standard';
@@ -484,12 +506,11 @@
 
                 const startData = await startResponse.json();
                 
-                // Mendapatkan Task ID sesuai spesifikasi response body
+                // Mendapatkan Task ID
                 const taskId = startData.data?.task_id || startData.task_id; 
                 if (!taskId) throw new Error("Task ID tidak didapatkan dari server.");
 
                 // 3. POLLING (MENGECEK STATUS RENDER TERUS MENERUS)
-                // Sesuai docs: "CREATED", "IN_PROGRESS", "COMPLETED", "FAILED"
                 loadingText.innerText = `Video sedang dirender oleh ${modelName}. Mohon tunggu (bisa memakan waktu 1-3 menit)...`;
                 
                 const checkTaskStatus = async () => {
@@ -505,8 +526,8 @@
 
                     if (currentStatus === "COMPLETED") {
                         // RENDER SUKSES
-                        const resultUrl = statusData.data?.generated?.[0];
-                        if (!resultUrl) throw new Error("URL Hasil Video tidak ditemukan.");
+                        const resultUrl = statusData.data?.generated?.[0] || statusData.generated?.[0];
+                        if (!resultUrl) throw new Error("URL Hasil Video tidak ditemukan dari Magnific.");
 
                         loadingOverlay.classList.add('hidden');
                         loadingOverlay.classList.remove('flex');
@@ -533,7 +554,6 @@
                         window.showMessage("Berhasil!", "Video Motion Control telah selesai dengan perlindungan wajah yang ketat!");
 
                     } else if (currentStatus === "FAILED") {
-                        // RENDER GAGAL DARI SANANYA
                         loadingOverlay.classList.add('hidden');
                         loadingOverlay.classList.remove('flex');
                         window.showMessage("Render Gagal", "Server AI Magnific menolak atau gagal memproses video.");
