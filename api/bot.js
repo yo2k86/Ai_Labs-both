@@ -33,7 +33,7 @@ async function getAuthEmail(userId) {
 // --- TEKS PANDUAN LENGKAP (TUTORIAL) ---
 const getTutorialText = (email) => {
     return `✅ *Akses Diberikan!*\n\n` +
-        `Halo !!!! 👋 selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `Selamat datang, *${email}*. Akses kamu berhasil diverifikasi. 🎉\n\n` +
         `📖 *PANDUAN PENGGUNAAN AILABS BOT BY BANGPRO*\n\n` +
         `*1️⃣ Langkah Pertama: Siapkan API Key*\n` +
@@ -41,7 +41,7 @@ const getTutorialText = (email) => {
         `• Login/Daftar ke Freepik lewat link ini: [Login Freepik](https://www.freepik.com/api)\n` +
         `• Setelah login, masuk ke Dashboard API: [Dashboard API Key](https://www.freepik.com/developers/dashboard/api-key)\n` +
         `• Klik tombol *Create API Key*, lalu *Copy* (salin) kodenya dan simpan di catatanmu.\n` +
-        `• Kembali ke bot ini, lalu ketik perintah: \`/setkey API_KEY_KAMU\`\n\n` +
+        `• Klik tombol "Masukkan / Ganti API Key" di bawah untuk menyimpan key kamu ke bot.\n\n` +
         `*2️⃣ Perintah Dasar Bot (Command)*\n` +
         `• 🎬 \`/video\` - Buka menu utama untuk membuat video AI\n` +
         `• 🔍 \`/lacak\` - Mengecek status video terakhir yang kamu proses\n` +
@@ -49,13 +49,13 @@ const getTutorialText = (email) => {
         `• 🔑 \`/apikey\` - Mengecek, memasukkan, atau menghapus API Key\n\n` +
         `*3️⃣ Alur Bikin Video: 🎭 Motion Control*\n` +
         `_(Menggerakkan foto menggunakan referensi video)_\n` +
-        `• Ketik \`/video\` lalu pilih *Motion Control*.\n` +
+        `• Pilih menu *Motion Control* di bawah atau ketik \`/video\`.\n` +
         `• Kirim *FOTO* karakter referensinya.\n` +
         `• Setelah diminta, kirim *VIDEO* gerakannya (Maks 20MB).\n` +
         `• Tunggu proses render AI, klik tombol *Lacak Task Ini* untuk download hasilnya.\n\n` +
         `*4️⃣ Alur Bikin Video: 📹 Veo 3.1*\n` +
         `_(Membuat video sinematik + suara dari foto dan teks)_\n` +
-        `• Ketik \`/video\` lalu pilih *Veo 3.1*.\n` +
+        `• Pilih menu *Veo 3.1* di bawah atau ketik \`/video\`.\n` +
         `• Kirim *FOTO* referensinya.\n` +
         `• Pilih *RASIO* ukuran video (16:9 atau 9:16).\n` +
         `• Ketik *PROMPT* (Deskripsi visual dan ucapan). \n` +
@@ -68,7 +68,7 @@ const getTutorialText = (email) => {
 // ==========================================
 bot.start((ctx) => {
     ctx.replyWithMarkdown(
-        `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo,!!! 👋 selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `⚠️ *Sistem Terkunci. 🔒*\nSebelum bisa menggunakan fitur bot, kamu harus memverifikasi aksesmu menggunakan email yang sudah didaftarkan ke Bangpro.\n\n` +
         `Gunakan perintah ini:\n🔑 \`/login [email_kamu]\``
     );
@@ -93,8 +93,36 @@ bot.command('login', async (ctx) => {
             });
 
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            // Menampilkan sapaan + panduan lengkap setelah login sukses
-            ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
+            
+            // 1. Menampilkan sapaan + panduan lengkap
+            await ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
+
+            // 2. Memunculkan otomatis menu Pengaturan API Key
+            const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
+            let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
+            
+            await ctx.replyWithMarkdown(
+                `🔑 *Pengaturan API Key*\n\n` +
+                `Status API Key saat ini: ${status}\n\n` +
+                `🔗 *Link Mendapatkan API Key:*\n` +
+                `• Info API Freepik: [Klik di sini](https://www.freepik.com/api)\n` +
+                `• Dashboard API Key: [Ambil Key di sini](https://www.freepik.com/developers/dashboard/api-key)\n\n` +
+                `Pilih aksi di bawah ini:`,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
+                    [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
+                ])
+            );
+
+            // 3. Memunculkan otomatis menu pembuatan Video
+            await ctx.replyWithMarkdown(
+                `🎬 *Buat Video AI*\n\nPilih model AI yang ingin digunakan:`,
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('🎭 Motion Control', 'model_motion')],
+                    [Markup.button.callback('📹 Veo 3.1', 'model_veo')]
+                ])
+            );
+
         } else {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
             ctx.replyWithMarkdown(`⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs. 😔`);
@@ -122,18 +150,27 @@ bot.command(['test', 'halo', 'hi', 'help', 'bantuan', 'panduan'], async (ctx) =>
     
     if (email) {
         // Jika sudah login, tampilkan sapaan + tutorial penuh
-        ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
+        await ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
+        
+        // Memunculkan menu video juga untuk memudahkan
+        await ctx.replyWithMarkdown(
+            `🎬 *Buat Video AI*\n\nPilih model AI yang ingin digunakan:`,
+            Markup.inlineKeyboard([
+                [Markup.button.callback('🎭 Motion Control', 'model_motion')],
+                [Markup.button.callback('📹 Veo 3.1', 'model_veo')]
+            ])
+        );
     } else {
         // Jika belum login, ingatkan untuk login
         ctx.replyWithMarkdown(
-            `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+            `Halo,!!!selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
             `⚠️ Kamu belum login nih brow.\nKetik \`/login [email_kamu]\` untuk membuka akses fitur dan melihat panduan bot. 🔑`
         );
     }
 });
 
 // ==========================================
-// FITUR PENGATURAN API KEY (SUDAH ADA LINK)
+// FITUR PENGATURAN API KEY 
 // ==========================================
 bot.command('apikey', async (ctx) => {
     const userId = ctx.from.id;
@@ -239,7 +276,7 @@ bot.action('model_motion', async (ctx) => {
 
     await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan /apikey.`);
+    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan menu API Key.`);
 
     await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO_MOTION' });
     ctx.replyWithMarkdown(`🎭 *Motion Control*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** karakter referensinya ke sini. 📸`); 
@@ -251,13 +288,32 @@ bot.action('model_veo', async (ctx) => {
 
     await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan /apikey.`);
+    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan menu API Key.`);
 
     await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO_VEO' });
     ctx.replyWithMarkdown(`📹 *Veo 3.1 (Photo Reference)*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** referensinya ke sini. 📸`); 
 });
 
-bot.action('menu_apikey', (ctx) => { ctx.answerCbQuery(); ctx.reply('Gunakan perintah /apikey untuk mengatur key. 🔑'); });
+bot.action('menu_apikey', (ctx) => { 
+    ctx.answerCbQuery(); 
+    // Mengarahkan tombol menu_apikey agar kembali ke tampilan command /apikey
+    const userId = ctx.from.id;
+    db.collection('apiKeys').doc(userId.toString()).get().then(keyDoc => {
+        let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
+        ctx.replyWithMarkdown(
+            `🔑 *Pengaturan API Key*\n\n` +
+            `Status API Key saat ini: ${status}\n\n` +
+            `🔗 *Link Mendapatkan API Key:*\n` +
+            `• Info API Freepik: [Klik di sini](https://www.freepik.com/api)\n` +
+            `• Dashboard API Key: [Ambil Key di sini](https://www.freepik.com/developers/dashboard/api-key)\n\n` +
+            `Pilih aksi di bawah ini:`,
+            Markup.inlineKeyboard([
+                [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
+                [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
+            ])
+        );
+    });
+});
 
 // --- HANDLER FOTO UNTUK KEDUA MODEL ---
 bot.on('photo', async (ctx, next) => {
