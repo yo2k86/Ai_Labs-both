@@ -30,12 +30,45 @@ async function getAuthEmail(userId) {
     }
 }
 
+// --- TEKS PANDUAN LENGKAP (TUTORIAL) ---
+const getTutorialText = (email) => {
+    return `✅ *Akses Diberikan!*\n\n` +
+        `Halo !!!! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Selamat datang, *${email}*. Akses kamu berhasil diverifikasi. 🎉\n\n` +
+        `📖 *PANDUAN PENGGUNAAN AILABS BOT BY BANGPRO*\n\n` +
+        `*1️⃣ Langkah Pertama: Siapkan API Key*\n` +
+        `Bot ini butuh akses API. Ikuti langkah ini:\n` +
+        `• Login/Daftar ke Freepik lewat link ini: [Login Freepik](https://www.freepik.com/api)\n` +
+        `• Setelah login, masuk ke Dashboard API: [Dashboard API Key](https://www.freepik.com/developers/dashboard/api-key)\n` +
+        `• Klik tombol *Create API Key*, lalu *Copy* (salin) kodenya dan simpan di catatanmu.\n` +
+        `• Kembali ke bot ini, lalu ketik perintah: \`/setkey API_KEY_KAMU\`\n\n` +
+        `*2️⃣ Perintah Dasar Bot (Command)*\n` +
+        `• 🎬 \`/video\` - Buka menu utama untuk membuat video AI\n` +
+        `• 🔍 \`/lacak\` - Mengecek status video terakhir yang kamu proses\n` +
+        `• 📜 \`/history\` - Melihat 5 riwayat video terakhirmu\n` +
+        `• 🔑 \`/apikey\` - Mengecek, memasukkan, atau menghapus API Key\n\n` +
+        `*3️⃣ Alur Bikin Video: 🎭 Motion Control*\n` +
+        `_(Menggerakkan foto menggunakan referensi video)_\n` +
+        `• Ketik \`/video\` lalu pilih *Motion Control*.\n` +
+        `• Kirim *FOTO* karakter referensinya.\n` +
+        `• Setelah diminta, kirim *VIDEO* gerakannya (Maks 20MB).\n` +
+        `• Tunggu proses render AI, klik tombol *Lacak Task Ini* untuk download hasilnya.\n\n` +
+        `*4️⃣ Alur Bikin Video: 📹 Veo 3.1*\n` +
+        `_(Membuat video sinematik + suara dari foto dan teks)_\n` +
+        `• Ketik \`/video\` lalu pilih *Veo 3.1*.\n` +
+        `• Kirim *FOTO* referensinya.\n` +
+        `• Pilih *RASIO* ukuran video (16:9 atau 9:16).\n` +
+        `• Ketik *PROMPT* (Deskripsi visual dan ucapan). \n` +
+        `   ⚠️ *Penting:* Untuk membuat AI berbicara, wajib gunakan tanda kutip! Contoh: \`Pria itu berkata: "mel melya muleo mell"\`\n` +
+        `• Tunggu proses render AI, lalu lacak videonya sampai selesai! 🚀`;
+};
+
 // ==========================================
 // COMMAND DASAR (START, LOGIN, LOGOUT, HELP)
 // ==========================================
 bot.start((ctx) => {
     ctx.replyWithMarkdown(
-        `Halo,  👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `⚠️ *Sistem Terkunci. 🔒*\nSebelum bisa menggunakan fitur bot, kamu harus memverifikasi aksesmu menggunakan email yang sudah didaftarkan ke Bangpro.\n\n` +
         `Gunakan perintah ini:\n🔑 \`/login [email_kamu]\``
     );
@@ -60,13 +93,8 @@ bot.command('login', async (ctx) => {
             });
 
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-            ctx.replyWithMarkdown(
-                `✅ *Akses Diberikan!*\n\nSelamat datang, *${email}*. Akses kamu berhasil diverifikasi. 🎉\n\n` +
-                `Sekarang kamu bisa menggunakan perintah:\n` +
-                `🎬 /video - Menu Pembuatan Video AI\n` +
-                `🔑 /apikey - Pengaturan API Key Magnific\n` +
-                `📜 /history - Cek Riwayat Video Terakhir`
-            );
+            // Menampilkan sapaan + panduan lengkap setelah login sukses
+            ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
         } else {
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
             ctx.replyWithMarkdown(`⛔ *Akses Ditolak!*\n\nEmail \`${email}\` belum terdaftar di sistem Ailabs. 😔`);
@@ -88,20 +116,24 @@ bot.command('logout', async (ctx) => {
     }
 });
 
-bot.command(['test', 'halo', 'hi', 'help', 'bantuan'], async (ctx) => {
+bot.command(['test', 'halo', 'hi', 'help', 'bantuan', 'panduan'], async (ctx) => {
     await ctx.sendChatAction('typing');
     const email = await getAuthEmail(ctx.from.id);
-    let msg = `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🤖,,\n\n`;
+    
     if (email) {
-        msg += `Ketik /video untuk masuk ke menu pembuatan video AI. 🎬\nKetik /history untuk mengecek riwayat video. 📜`;
+        // Jika sudah login, tampilkan sapaan + tutorial penuh
+        ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
     } else {
-        msg += `Ketik /login [email] untuk membuka akses fitur. 🔑`;
+        // Jika belum login, ingatkan untuk login
+        ctx.replyWithMarkdown(
+            `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+            `⚠️ Kamu belum login nih brow.\nKetik \`/login [email_kamu]\` untuk membuka akses fitur dan melihat panduan bot. 🔑`
+        );
     }
-    ctx.replyWithMarkdown(msg);
 });
 
 // ==========================================
-// FITUR PENGATURAN API KEY
+// FITUR PENGATURAN API KEY (SUDAH ADA LINK)
 // ==========================================
 bot.command('apikey', async (ctx) => {
     const userId = ctx.from.id;
@@ -113,7 +145,12 @@ bot.command('apikey', async (ctx) => {
     let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
 
     ctx.replyWithMarkdown(
-        `🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ${status}\n\nPilih aksi di bawah ini:`,
+        `🔑 *Pengaturan API Key*\n\n` +
+        `Status API Key saat ini: ${status}\n\n` +
+        `🔗 *Link Mendapatkan API Key:*\n` +
+        `• Info API Freepik: [Klik di sini](https://www.freepik.com/api)\n` +
+        `• Dashboard API Key: [Ambil Key di sini](https://www.freepik.com/developers/dashboard/api-key)\n\n` +
+        `Pilih aksi di bawah ini:`,
         Markup.inlineKeyboard([
             [Markup.button.callback('➕ Masukkan / Ganti API Key', 'action_set_apikey')],
             [Markup.button.callback('🗑️ Hapus API Key', 'action_delete_apikey')]
@@ -124,7 +161,7 @@ bot.command('apikey', async (ctx) => {
 bot.action('action_set_apikey', async (ctx) => {
     ctx.answerCbQuery();
     ctx.replyWithMarkdown(
-        '👇 Silakan balas (reply) pesan ini dengan API Key Magnific kamu:\n_(Atau ketik manual: /setkey API_KEY_KAMU)_',
+        '👇 Silakan balas (reply) pesan ini dengan API Key Freepik/Magnific kamu:\n_(Atau ketik manual: /setkey API_KEY_KAMU)_',
         Markup.forceReply()
     );
 });
@@ -134,10 +171,17 @@ bot.action('action_delete_apikey', async (ctx) => {
     try {
         await db.collection('apiKeys').doc(userId.toString()).delete();
         ctx.answerCbQuery('🗑️ API Key berhasil dihapus!', { show_alert: true });
-        ctx.editMessageText('🔑 *Pengaturan API Key Magnific*\n\nStatus API Key saat ini: ❌ Belum ada', {
-            parse_mode: 'Markdown',
-            reply_markup: { inline_keyboard: [[{ text: '➕ Masukkan / Ganti API Key', callback_data: 'action_set_apikey' }]] }
-        });
+        ctx.editMessageText(
+            `🔑 *Pengaturan API Key*\n\nStatus API Key saat ini: ❌ Belum ada\n\n` +
+            `🔗 *Link Mendapatkan API Key:*\n` +
+            `• Info API Freepik: [Klik di sini](https://www.freepik.com/api)\n` +
+            `• Dashboard API Key: [Ambil Key di sini](https://www.freepik.com/developers/dashboard/api-key)`, 
+            {
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true,
+                reply_markup: { inline_keyboard: [[{ text: '➕ Masukkan / Ganti API Key', callback_data: 'action_set_apikey' }]] }
+            }
+        );
     } catch (e) {
         ctx.answerCbQuery('Gagal menghapus API Key.', { show_alert: true });
     }
@@ -157,7 +201,7 @@ bot.command('setkey', async (ctx) => {
         await axios.get('https://api.magnific.com/v1/ai/reference-to-video/veo-3-1', { headers: { 'x-magnific-api-key': apiKey } });
         await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        return ctx.replyWithMarkdown(`✅ *API Key Valid!* Sekarang kamu bisa menggunakan /video. 🎉`);
+        return ctx.replyWithMarkdown(`✅ *API Key Valid!* Sekarang kamu bisa membuat video dengan \`/video\`. 🎉`);
     } catch (error) {
         await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         if (error.response && error.response.status === 401) {
@@ -166,7 +210,7 @@ bot.command('setkey', async (ctx) => {
             await db.collection('apiKeys').doc(userId.toString()).set({ key: apiKey });
             return ctx.reply(`✅ API Key Disimpan (Catatan)\nSistem menerima limitasi akun: "${error.response.data?.message}"`);
         } else {
-            return ctx.reply(`❌ Koneksi Gagal ke Magnific.`);
+            return ctx.reply(`❌ Koneksi Gagal ke Freepik/Magnific.`);
         }
     }
 });
@@ -195,7 +239,7 @@ bot.action('model_motion', async (ctx) => {
 
     await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key Magnific. Gunakan /apikey.`);
+    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan /apikey.`);
 
     await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO_MOTION' });
     ctx.replyWithMarkdown(`🎭 *Motion Control*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** karakter referensinya ke sini. 📸`); 
@@ -207,7 +251,7 @@ bot.action('model_veo', async (ctx) => {
 
     await ctx.sendChatAction('typing');
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key Magnific. Gunakan /apikey.`);
+    if (!keyDoc.exists) return ctx.reply(`⚠️ Kamu belum memasukkan API Key. Gunakan /apikey.`);
 
     await db.collection('userStates').doc(userId.toString()).set({ step: 'WAITING_PHOTO_VEO' });
     ctx.replyWithMarkdown(`📹 *Veo 3.1 (Photo Reference)*\n\nSip! Pertama, silakan **Kirim/Upload FOTO** referensinya ke sini. 📸`); 
@@ -318,7 +362,6 @@ bot.on('text', async (ctx, next) => {
     if (stateDoc.exists && stateDoc.data().step === 'WAITING_PROMPT_VEO') {
         const userPrompt = ctx.message.text.trim();
         
-        // PENTING: Force prompt biar AI patuh baca skrip persis, nggak ngarang, dan pakai bahasa Indonesia.
         const enhancedPrompt = `${userPrompt}\n\nIMPORTANT AUDIO INSTRUCTIONS: If the prompt contains dialogue or specific words to be spoken (especially if enclosed in quotes), the character MUST say those EXACT words. Do not improvise the dialogue. Speak strictly and clearly in Indonesian (Bahasa Indonesia).`;
 
         await ctx.sendChatAction('upload_video');
