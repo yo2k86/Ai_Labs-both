@@ -35,7 +35,7 @@ async function getAuthEmail(userId) {
 // ==========================================
 bot.start((ctx) => {
     ctx.replyWithMarkdown(
-        `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo,  👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `⚠️ *Sistem Terkunci. 🔒*\nSebelum bisa menggunakan fitur bot, kamu harus memverifikasi aksesmu menggunakan email yang sudah didaftarkan ke Bangpro.\n\n` +
         `Gunakan perintah ini:\n🔑 \`/login [email_kamu]\``
     );
@@ -242,11 +242,18 @@ bot.on('photo', async (ctx, next) => {
                 } 
                 else if (step === 'WAITING_PHOTO_VEO') {
                     await db.collection('userStates').doc(userId.toString()).update({
-                        step: 'WAITING_PROMPT_VEO',
+                        step: 'WAITING_RATIO_VEO', 
                         tempImageUrl: imageUrl
                     });
                     await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-                    return ctx.replyWithMarkdown(`✅ *Foto Diterima (Veo 3.1)!*\n\nSekarang, silakan ketik **PROMPT (Deskripsi)** untuk video yang ingin kamu generate. ✍️\n_(Contoh: The character walks through a futuristic city at night)_`);
+                    
+                    return ctx.replyWithMarkdown(
+                        `✅ *Foto Diterima (Veo 3.1)!*\n\nSekarang, pilih **Rasio Video** yang kamu inginkan: 📏`,
+                        Markup.inlineKeyboard([
+                            [Markup.button.callback('🖥️ 16:9 (Landscape)', 'ratio_veo_16:9')],
+                            [Markup.button.callback('📱 9:16 (Portrait/TikTok)', 'ratio_veo_9:16')]
+                        ])
+                    );
                 }
             } catch (error) {
                 await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
@@ -256,6 +263,28 @@ bot.on('photo', async (ctx, next) => {
     }
     return next();
 });
+
+// --- HANDLER PILIH RASIO VEO ---
+bot.action(/^ratio_veo_(.+)$/, async (ctx) => {
+    ctx.answerCbQuery();
+    const ratio = ctx.match[1];
+    const userId = ctx.from.id;
+
+    await db.collection('userStates').doc(userId.toString()).update({
+        step: 'WAITING_PROMPT_VEO',
+        selectedRatio: ratio
+    });
+
+    ctx.editMessageText(
+        `✅ *Rasio Dipilih: ${ratio}*\n\nSekarang, silakan ketik **PROMPT (Deskripsi)** untuk video dan suara.\n\n` +
+        `⚠️ *TIPS PENTING UNTUK SUARA:*\n` +
+        `Biar AI nyebutin kata-katanya dengan **PAS**, wajib gunakan tanda kutip \`"..."\` untuk kata yang mau diucapkan!\n\n` +
+        `*Contoh ketik prompt yang benar:*\n` +
+        `\`Pria menatap kamera. Dia berkata: "mel melya muleo mell"\``,
+        { parse_mode: 'Markdown' }
+    );
+});
+
 
 // --- HANDLER TEXT (UNTUK PROMPT VEO & API KEY) ---
 bot.on('text', async (ctx, next) => {
@@ -287,13 +316,17 @@ bot.on('text', async (ctx, next) => {
     const stateDoc = await db.collection('userStates').doc(userId.toString()).get();
 
     if (stateDoc.exists && stateDoc.data().step === 'WAITING_PROMPT_VEO') {
-        const promptText = ctx.message.text.trim();
+        const userPrompt = ctx.message.text.trim();
         
+        // PENTING: Force prompt biar AI patuh baca skrip persis, nggak ngarang, dan pakai bahasa Indonesia.
+        const enhancedPrompt = `${userPrompt}\n\nIMPORTANT AUDIO INSTRUCTIONS: If the prompt contains dialogue or specific words to be spoken (especially if enclosed in quotes), the character MUST say those EXACT words. Do not improvise the dialogue. Speak strictly and clearly in Indonesian (Bahasa Indonesia).`;
+
         await ctx.sendChatAction('upload_video');
         const loadingMsg = await ctx.reply('⏳ Sedang memproses dan mengirim tugas ke Magnific Veo 3.1...\n_Proses ini butuh waktu beberapa saat._ 🚀');
         
         try {
             const imageUrl = stateDoc.data().tempImageUrl;
+            const selectedRatio = stateDoc.data().selectedRatio || '16:9'; 
             const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
             const activeKey = keyDoc.data().key;
 
@@ -301,9 +334,9 @@ bot.on('text', async (ctx, next) => {
                 'https://api.magnific.com/v1/ai/reference-to-video/veo-3-1',
                 { 
                     image_urls: [imageUrl], 
-                    prompt: promptText,
+                    prompt: enhancedPrompt,
                     resolution: "720p",
-                    aspect_ratio: "16:9",
+                    aspect_ratio: selectedRatio,
                     generate_audio: true
                 },
                 { headers: { 'Content-Type': 'application/json', 'x-magnific-api-key': activeKey } }
@@ -324,7 +357,7 @@ bot.on('text', async (ctx, next) => {
                     ctx.chat.id,
                     loadingMsg.message_id,
                     undefined,
-                    `✅ *Tugas Berhasil Dikirim (Veo 3.1)!*\n\nTask ID: \`${taskId}\`\nStatus AI: ⏳ In Progress\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
+                    `✅ *Tugas Berhasil Dikirim (Veo 3.1)!*\n\nTask ID: \`${taskId}\`\nRasio: ${selectedRatio}\nStatus AI: ⏳ In Progress\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
                     {
                         parse_mode: 'Markdown',
                         reply_markup: {
