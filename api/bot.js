@@ -52,7 +52,7 @@ const getTutorialText = (email) => {
         `• Pilih menu *Motion Control* di bawah atau ketik \`/video\`.\n` +
         `• Kirim *FOTO* karakter referensinya.\n` +
         `• Setelah diminta, kirim *VIDEO* gerakannya (Maks 20MB).\n` +
-        `• Tunggu proses render AI, klik tombol *Lacak Task Ini* untuk download hasilnya.\n\n` +
+        `• Panel Pelacakan otomatis akan muncul, klik tombolnya sampai selesai.\n\n` +
         `*4️⃣ Alur Bikin Video: 📹 Veo 3.1*\n` +
         `_(Membuat video sinematik + suara dari foto dan teks)_\n` +
         `• Pilih menu *Veo 3.1* di bawah atau ketik \`/video\`.\n` +
@@ -60,7 +60,7 @@ const getTutorialText = (email) => {
         `• Pilih *RASIO* ukuran video (16:9 atau 9:16).\n` +
         `• Ketik *PROMPT* (Deskripsi visual dan ucapan). \n` +
         `   ⚠️ *Penting:* Untuk membuat AI berbicara, wajib gunakan tanda kutip! Contoh: \`Pria itu berkata: "mel melya muleo mell"\`\n` +
-        `• Tunggu proses render AI, lalu lacak videonya sampai selesai! 🚀`;
+        `• Panel Pelacakan otomatis akan muncul, lacak videonya sampai selesai! 🚀`;
 };
 
 // ==========================================
@@ -68,7 +68,7 @@ const getTutorialText = (email) => {
 // ==========================================
 bot.start((ctx) => {
     ctx.replyWithMarkdown(
-        `Halo,!!! 👋 selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `⚠️ *Sistem Terkunci. 🔒*\nSebelum bisa menggunakan fitur bot, kamu harus memverifikasi aksesmu menggunakan email yang sudah didaftarkan ke Bangpro.\n\n` +
         `Gunakan perintah ini:\n🔑 \`/login [email_kamu]\``
     );
@@ -149,10 +149,7 @@ bot.command(['test', 'halo', 'hi', 'help', 'bantuan', 'panduan'], async (ctx) =>
     const email = await getAuthEmail(ctx.from.id);
     
     if (email) {
-        // Jika sudah login, tampilkan sapaan + tutorial penuh
         await ctx.replyWithMarkdown(getTutorialText(email), { disable_web_page_preview: true });
-        
-        // Memunculkan menu video juga untuk memudahkan
         await ctx.replyWithMarkdown(
             `🎬 *Buat Video AI*\n\nPilih model AI yang ingin digunakan:`,
             Markup.inlineKeyboard([
@@ -161,9 +158,8 @@ bot.command(['test', 'halo', 'hi', 'help', 'bantuan', 'panduan'], async (ctx) =>
             ])
         );
     } else {
-        // Jika belum login, ingatkan untuk login
         ctx.replyWithMarkdown(
-            `Halo,!!!selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+            `Halo, Bang! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
             `⚠️ Kamu belum login nih brow.\nKetik \`/login [email_kamu]\` untuk membuka akses fitur dan melihat panduan bot. 🔑`
         );
     }
@@ -296,7 +292,6 @@ bot.action('model_veo', async (ctx) => {
 
 bot.action('menu_apikey', (ctx) => { 
     ctx.answerCbQuery(); 
-    // Mengarahkan tombol menu_apikey agar kembali ke tampilan command /apikey
     const userId = ctx.from.id;
     db.collection('apiKeys').doc(userId.toString()).get().then(keyDoc => {
         let status = keyDoc.exists ? "✅ Diterima & Aktif" : "❌ Belum ada";
@@ -452,19 +447,23 @@ bot.on('text', async (ctx, next) => {
             await db.collection('userStates').doc(userId.toString()).delete(); 
 
             if (taskId) {
-                return ctx.telegram.editMessageText(
+                await ctx.telegram.editMessageText(
                     ctx.chat.id,
                     loadingMsg.message_id,
                     undefined,
-                    `✅ *Tugas Berhasil Dikirim (Veo 3.1)!*\n\nTask ID: \`${taskId}\`\nRasio: ${selectedRatio}\nStatus AI: ⏳ In Progress\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔍 Lacak Task Ini', callback_data: `track_veo_${taskId}` }]
-                            ]
-                        }
-                    }
+                    `✅ *Tugas Berhasil Dikirim ke Server!* 🚀\nVideo Veo 3.1 kamu sedang mulai diproses.`,
+                    { parse_mode: 'Markdown' }
+                );
+                
+                // PANEL LACAK OTOMATIS SAAT MENUNGGU
+                return ctx.replyWithMarkdown(
+                    `🔍 *Lacak Video Otomatis*\n\n` +
+                    `Task ID: \`${taskId}\`\n` +
+                    `Rasio: ${selectedRatio}\n\n` +
+                    `👇 *Klik tombol di bawah ini secara berkala* untuk mengecek apakah videomu sudah selesai dirender:`,
+                    Markup.inlineKeyboard([
+                        [Markup.button.callback('🔍 Cek Status Video Sekarang', `track_veo_${taskId}`)]
+                    ])
                 );
             } else {
                 return ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `⚠️ Tugas terkirim tapi Task ID tidak terbaca. Coba ulangi. 🔄`);
@@ -533,15 +532,18 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
                     ctx.chat.id,
                     loadingMsg.message_id,
                     undefined,
-                    `✅ *Tugas Berhasil Dikirim (Motion)!*\n\nTask ID: \`${taskId}\`\nStatus AI: ⏳ In Progress\n\nKlik tombol di bawah ini untuk melacak status render video kamu.`,
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '🔍 Lacak Task Ini', callback_data: `track_motion_${taskId}` }]
-                            ]
-                        }
-                    }
+                    `✅ *Tugas Berhasil Dikirim ke Server!* 🚀\nVideo Motion Control kamu sedang mulai diproses.`,
+                    { parse_mode: 'Markdown' }
+                );
+                
+                // PANEL LACAK OTOMATIS SAAT MENUNGGU
+                await ctx.replyWithMarkdown(
+                    `🔍 *Lacak Video Otomatis*\n\n` +
+                    `Task ID: \`${taskId}\`\n\n` +
+                    `👇 *Klik tombol di bawah ini secara berkala* untuk mengecek apakah videomu sudah selesai dirender:`,
+                    Markup.inlineKeyboard([
+                        [Markup.button.callback('🔍 Cek Status Video Sekarang', `track_motion_${taskId}`)]
+                    ])
                 );
             } else {
                 await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, `⚠️ Tugas terkirim tapi Task ID tidak terbaca. Coba ulangi. 🔄`);
@@ -632,11 +634,17 @@ bot.action(/^track_(motion|veo)_(.+)$/, async (ctx) => {
         } 
         else if (status === 'IN_PROGRESS' || status === 'CREATED') { 
             const cleanStatus = status.replace(/_/g, ' ');
+            
+            // Tambahan waktu biar user tahu datanya baru di-update
+            const d = new Date();
+            const timeString = d.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
+
             ctx.replyWithMarkdown(
                 `🔄 *Status AI: ${cleanStatus}*\n\n` +
-                `Video masih dirender brow. Task ID: \`${taskId}\` ⏳\n\n` +
-                `Klik lacak lagi dalam beberapa menit.`,
-                Markup.inlineKeyboard([[Markup.button.callback('🔍 Lacak Task Ini', `track_${model}_${taskId}`)]])
+                `Video kamu masih dalam antrean/dirender, brow. ⏳\n` +
+                `_Pengecekan terakhir: jam ${timeString} WIB_\n\n` +
+                `Silakan klik tombol di bawah ini lagi untuk terus memantau progress-nya:`,
+                Markup.inlineKeyboard([[Markup.button.callback('🔍 Cek Status Video Lagi', `track_${model}_${taskId}`)]])
             );
         } 
         else if (status === 'FAILED') { 
@@ -667,7 +675,7 @@ bot.command('lacak', async (ctx) => {
     ctx.replyWithMarkdown(
         `🔍 *Task Video Terakhir Kamu:*\n\`${taskId}\`\n\nKlik tombol di bawah ini untuk mengecek statusnya di Magnific:`,
         Markup.inlineKeyboard([
-            [Markup.button.callback('🔍 Lacak Task Ini', `track_${model}_${taskId}`)]
+            [Markup.button.callback('🔍 Cek Status Video Sekarang', `track_${model}_${taskId}`)]
         ])
     );
 });
@@ -680,7 +688,7 @@ bot.command('history', async (ctx) => {
     const userId = ctx.from.id;
 
     const keyDoc = await db.collection('apiKeys').doc(userId.toString()).get();
-    if (!keyDoc.exists) return ctx.reply('⚠️ API Key belum diatur. Gunakan /apikey 🔑');
+    if (!keyDoc.exists) return ctx.reply('⚠️ API Key belum diatur. Gunakan tombol API Key. 🔑');
     const activeKey = keyDoc.data().key;
 
     const loadingMsg = await ctx.reply('⏳ Mengambil riwayat dari server Magnific (Motion & Veo)...');
