@@ -33,7 +33,7 @@ async function getAuthEmail(userId) {
 // --- TEKS PANDUAN LENGKAP (TUTORIAL) ---
 const getTutorialText = (email) => {
     return `✅ *Akses Diberikan!*\n\n` +
-        `Halo !!!! 👋 Selamat datang di *Ailabs gen pro*... halo ..selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
+        `Halo !!!! 👋 selamat datang di Ailabs bot by Bangpro 🚀,,\n\n` +
         `Selamat datang, *${email}*. Akses kamu berhasil diverifikasi. 🎉\n\n` +
         `📖 *PANDUAN PENGGUNAAN AILABS BOT BY BANGPRO*\n\n` +
         `*1️⃣ Langkah Pertama: Siapkan API Key*\n` +
