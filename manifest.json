@@ -1,0 +1,21 @@
+{
+"name": "Ailabs Gen Pro Admin",
+"short_name": "Ailabs Admin",
+"description": "Control Panel untuk Ailabs Telegram Bot",
+"start_url": "/admin.html",
+"display": "standalone",
+"background_color": "#0a1128",
+"theme_color": "#0a1128",
+"icons": [
+{
+"src": "https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png",
+"sizes": "192x192",
+"type": "image/png"
+},
+{
+"src": "https://i.ibb.co.com/4nFbhTSN/Desain-tanpa-judul-20260428-191052-0000.png",
+"sizes": "512x512",
+"type": "image/png"
+}
+]
+}
