@@ -92,6 +92,15 @@ bot.command('login', async (ctx) => {
                 loginAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
+            // --- Update status "Terakhir Aktif" saat user Login ---
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+            const dateString = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric' });
+            await db.collection('authorizedUsers').doc(email).update({
+                lastActive: `Login: ${dateString} ${timeString} WIB`
+            });
+            // -----------------------------------------------------------------------
+
             await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
             
             // 1. Menampilkan sapaan + panduan lengkap
@@ -444,6 +453,18 @@ bot.on('text', async (ctx, next) => {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
+            // --- Update "Total Render" & Aktivitas saat pake Veo ---
+            const userEmailVeo = await getAuthEmail(userId);
+            if (userEmailVeo) {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+                await db.collection('authorizedUsers').doc(userEmailVeo).update({
+                    usageCount: admin.firestore.FieldValue.increment(1),
+                    lastActive: `Render Veo: Hari ini ${timeString} WIB`
+                });
+            }
+            // ------------------------------------------------------------------------
+
             await db.collection('userStates').doc(userId.toString()).delete(); 
 
             if (taskId) {
@@ -525,6 +546,18 @@ bot.on(['video', 'animation', 'document'], async (ctx, next) => {
                 updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
 
+            // --- Update "Total Render" & Aktivitas saat pake Motion ---
+            const userEmailMotion = await getAuthEmail(userId);
+            if (userEmailMotion) {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+                await db.collection('authorizedUsers').doc(userEmailMotion).update({
+                    usageCount: admin.firestore.FieldValue.increment(1),
+                    lastActive: `Render Motion: Hari ini ${timeString} WIB`
+                });
+            }
+            // ---------------------------------------------------------------------------
+
             await db.collection('userStates').doc(userId.toString()).delete(); 
 
             if (taskId) {
@@ -588,6 +621,29 @@ bot.action(/^track_(motion|veo)_(.+)$/, async (ctx) => {
         if (status === 'COMPLETED') { 
             const videoUrl = taskData.generated[0]; 
             
+            // --- FITUR BARU: SIMPAN URL VIDEO KE DATABASE AGAR BISA DILIHAT ADMIN ---
+            try {
+                const userEmailCheck = await getAuthEmail(userId);
+                if (userEmailCheck) {
+                    const now = new Date();
+                    const dtString = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'short', year: 'numeric' });
+                    const tmString = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+                    
+                    await db.collection('authorizedUsers').doc(userEmailCheck).update({
+                        generatedVideos: admin.firestore.FieldValue.arrayUnion({
+                            url: videoUrl,
+                            model: model === 'veo' ? 'Veo 3.1' : 'Motion Control',
+                            taskId: taskId,
+                            time: `${dtString} ${tmString} WIB`,
+                            timestamp: Date.now()
+                        })
+                    });
+                }
+            } catch (err) {
+                console.error('Gagal menyimpan histori video ke database:', err);
+            }
+            // ------------------------------------------------------------------------
+
             try {
                 await ctx.replyWithVideo(
                     { url: videoUrl }, 
